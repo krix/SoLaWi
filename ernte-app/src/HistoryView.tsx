@@ -24,6 +24,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
   const [filterArticle, setFilterArticle] = useState<string>('Alle');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [printingSpecific, setPrintingSpecific] = useState<'depots' | 'harvest' | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +58,41 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
       console.error("Failed to export CSV:", e);
       alert("Fehler beim CSV Export.");
     }
+  };
+
+  const handleExportDepotStats = async () => {
+    const headers = ["Depot", "Kuerzel", "Basis Halbe Anteile", "kg Gesamt", "kg pro Halber Anteil", "Stk Gesamt", "Stk pro Halber Anteil"];
+    const rows = stats.map(s => [
+      s.depot,
+      s.kuerzel,
+      s.gesamtHalbeAnteile,
+      s.kgSum.toFixed(2).replace('.', ','),
+      s.kgFairSum.toFixed(2).replace('.', ','),
+      s.stkSum.toFixed(0),
+      s.stkFairSum.toFixed(2).replace('.', ',')
+    ].join(';'));
+    const csv = [headers.join(';'), ...rows].join('\n');
+    await invoke('save_csv_file', { content: csv, defaultName: `Depot-Statistik-${selectedYear}.csv` });
+  };
+
+  const handleExportHarvestStats = async () => {
+    const headers = ["Gemüsesorte", "Erntemenge Brutto", "Erntemenge Netto", "Stück"];
+    const rows = harvestStats.map(h => [
+      h.artikel,
+      h.kgSumBrutto.toFixed(2).replace('.', ','),
+      h.kgSumNetto.toFixed(2).replace('.', ','),
+      h.stkSum.toFixed(0)
+    ].join(';'));
+    const csv = [headers.join(';'), ...rows].join('\n');
+    await invoke('save_csv_file', { content: csv, defaultName: `Gesamternte-${selectedYear}.csv` });
+  };
+
+  const handlePrintSpecific = (type: 'depots' | 'harvest') => {
+    setPrintingSpecific(type);
+    setTimeout(() => {
+      window.print();
+      setPrintingSpecific(null);
+    }, 100);
   };
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,9 +267,9 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
   }, [baseFilteredData]);
 
   return (
-    <div className="glass-panel animate-in" style={{ padding: '2rem', width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
+    <div className={`glass-panel animate-in ${printingSpecific ? 'no-panel-style' : ''}`} style={{ padding: printingSpecific ? '0' : '2rem', width: '100%', maxWidth: '1000px', margin: '0 auto', background: printingSpecific ? 'white' : '' }}>
       
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className={printingSpecific ? 'no-print' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <h2 style={{ color: 'var(--color-primary)', margin: 0 }}>
@@ -292,7 +328,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
         </div>
       </div>
 
-      <div style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
+      <div className={printingSpecific ? 'no-print' : ''} style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
            <label style={{ fontWeight: 500, color: 'var(--color-text)' }}>Verlauf / Fairness pro Artikel anzeigen:</label>
            <select 
@@ -346,56 +382,78 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
              Keine chronologischen Daten für diesen Artikel in diesem Zeitraum vorhanden.
            </div>
         )}
-
-        <div className="table-container">
-          <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', padding: '1.5rem 1.5rem 0.5rem 1.5rem', margin: 0 }}>Depot-Lieferstatistik (Netto)</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Depot</th>
-                <th style={{ textAlign: 'center' }}>Basis Halbe Anteile</th>
-                <th style={{ textAlign: 'right' }}>Absolute gelieferte Menge</th>
-                <th style={{ textAlign: 'right', background: 'rgba(46, 165, 80, 0.05)' }}>
-                  ⭐ Reelle Menge pro 1/2 Anteil
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.filter(s => s.kgSum > 0 || s.stkSum > 0 || filterArticle === 'Alle').map((s, i) => {
-                const kgPerHalf = s.kgFairSum;
-                const stkPerHalf = s.stkFairSum;
-
-                return (
-                  <tr key={s.kuerzel}>
-                    <td style={{ fontWeight: 500 }}>
-                      <span style={{marginRight: '0.5rem', color: '#999'}}>{i+1}.</span>
-                      {s.depot} <span style={{color: '#999', fontSize: '0.85rem'}}>({s.kuerzel})</span>
-                    </td>
-                    <td style={{ textAlign: 'center', color: 'var(--color-text-light)' }}>
-                      {s.gesamtHalbeAnteile}
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 500, color: 'var(--color-text)' }}>
-                      {s.kgSum > 0 && <span>{s.kgSum.toLocaleString('de-DE', {maximumFractionDigits: 1})} kg</span>}
-                      {s.kgSum > 0 && s.stkSum > 0 && <span style={{margin:'0 0.5rem'}}>|</span>}
-                      {s.stkSum > 0 && <span>{s.stkSum.toLocaleString('de-DE')} Stück</span>}
-                      {s.kgSum === 0 && s.stkSum === 0 && <span style={{color: '#aaa'}}>-</span>}
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--color-primary)', background: 'rgba(46, 165, 80, 0.02)' }}>
-                      {s.kgSum > 0 && <span>{(kgPerHalf).toLocaleString('de-DE', {maximumFractionDigits: 2})} kg / 1/2 Anteil</span>}
-                      {s.kgSum > 0 && s.stkSum > 0 && <br/>}
-                      {s.stkSum > 0 && <span>{(stkPerHalf).toLocaleString('de-DE', {maximumFractionDigits: 2})} Stk / 1/2 Anteil</span>}
-                      {s.kgSum === 0 && s.stkSum === 0 && <span style={{color: '#aaa'}}>-</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
       </div>
 
-      <div className="table-container">
-        <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', padding: '1.5rem 1.5rem 0.5rem 1.5rem', margin: 0 }}>Gesamternte / Gemüsesorte (Brutto, inkl. 5% Schwund bei Gewichten)</h3>
+      {/* Depot-Lieferstatistik */}
+      <div className={`table-container ${printingSpecific === 'harvest' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'depots' ? 'none' : '', borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(46, 165, 80, 0.05)', padding: '1rem' }}>
+           <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', margin: 0 }}>Depot-Lieferstatistik (Netto)</h3>
+           <div className="no-print" style={{ display: 'flex', gap: '0.5rem' }}>
+             <button className="button outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => handlePrintSpecific('depots')}>
+                🖨️ Drucken
+             </button>
+             <button className="button outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={handleExportDepotStats}>
+                📥 CSV
+             </button>
+           </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Depot</th>
+              <th style={{ textAlign: 'center' }}>Basis Halbe Anteile</th>
+              <th style={{ textAlign: 'right' }}>Absolute gelieferte Menge</th>
+              <th style={{ textAlign: 'right', background: 'rgba(46, 165, 80, 0.05)' }}>
+                ⭐ Reelle Menge pro 1/2 Anteil
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {stats.filter(s => s.kgSum > 0 || s.stkSum > 0 || filterArticle === 'Alle').map((s, i) => {
+              const kgPerHalf = s.kgFairSum;
+              const stkPerHalf = s.stkFairSum;
+
+              return (
+                <tr key={s.kuerzel}>
+                  <td style={{ fontWeight: 500 }}>
+                    <span style={{marginRight: '0.5rem', color: '#999'}}>{i+1}.</span>
+                    {s.depot} <span style={{color: '#999', fontSize: '0.85rem'}}>({s.kuerzel})</span>
+                  </td>
+                  <td style={{ textAlign: 'center', color: 'var(--color-text-light)' }}>
+                    {s.gesamtHalbeAnteile}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 500, color: 'var(--color-text)' }}>
+                    {s.kgSum > 0 && <span>{s.kgSum.toLocaleString('de-DE', {maximumFractionDigits: 1})} kg</span>}
+                    {s.kgSum > 0 && s.stkSum > 0 && <span style={{margin:'0 0.5rem'}}>|</span>}
+                    {s.stkSum > 0 && <span>{s.stkSum.toLocaleString('de-DE')} Stück</span>}
+                    {s.kgSum === 0 && s.stkSum === 0 && <span style={{color: '#aaa'}}>-</span>}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--color-primary)', background: 'rgba(46, 165, 80, 0.02)' }}>
+                    {s.kgSum > 0 && <span>{(kgPerHalf).toLocaleString('de-DE', {maximumFractionDigits: 2})} kg / 1/2 Anteil</span>}
+                    {s.kgSum > 0 && s.stkSum > 0 && <br/>}
+                    {s.stkSum > 0 && <span>{(stkPerHalf).toLocaleString('de-DE', {maximumFractionDigits: 2})} Stk / 1/2 Anteil</span>}
+                    {s.kgSum === 0 && s.stkSum === 0 && <span style={{color: '#aaa'}}>-</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Gesamternte / Gemüsesorte */}
+      <div className={`table-container ${printingSpecific === 'depots' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'harvest' ? 'none' : '' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(46, 165, 80, 0.05)', padding: '1rem' }}>
+          <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', margin: 0 }}>Gesamternte / Gemüsesorte (Brutto, inkl. 5% Schwund)</h3>
+          <div className="no-print" style={{ display: 'flex', gap: '0.5rem' }}>
+             <button className="button outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => handlePrintSpecific('harvest')}>
+                🖨️ Drucken
+             </button>
+             <button className="button outline" style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={handleExportHarvestStats}>
+                📥 CSV
+             </button>
+          </div>
+        </div>
         <table>
           <thead>
             <tr>
