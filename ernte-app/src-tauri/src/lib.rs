@@ -18,10 +18,11 @@ fn contains_data_files(dir: &Path) -> bool {
 
 /// Resolves the data directory by searching upwards from the executable
 /// (handles dev-mode where the exe is inside target/debug/) and also
-/// checks the current working directory.  Prefers the highest-level
-/// (outermost) directory that contains data files so that in dev-mode
-/// the workspace root is chosen over target/debug/ which may only hold
-/// a partial copy.  Falls back to the exe directory for fresh installs.
+/// checks the current working directory and Linux resource paths.
+/// Prefers the highest-level (outermost) directory that contains data
+/// files so that in dev-mode the workspace root is chosen over
+/// target/debug/ which may only hold a partial copy.
+/// Falls back to the exe directory for fresh installs.
 fn get_base_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
@@ -55,6 +56,15 @@ fn get_base_path() -> PathBuf {
             if contains_data_files(&parent.to_path_buf()) {
                 return parent.to_path_buf();
             }
+        }
+    }
+
+    // Linux .deb: resources are at /usr/lib/<identifier>/
+    #[cfg(target_os = "linux")]
+    {
+        let linux_resource_dir = PathBuf::from("/usr/lib/com.solawi.ernte");
+        if contains_data_files(&linux_resource_dir) {
+            return linux_resource_dir;
         }
     }
 

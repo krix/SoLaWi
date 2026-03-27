@@ -24,9 +24,9 @@ Sobald das Skript fertig ist, findest du deine Installationsdateien hier:
 ```text
 ernte-app/src-tauri/target/release/bundle/
 ├── deb/
-│   └── ernte-app_0.1.0_amd64.deb     <-- Doppelklick zum Installieren
+│   └── ernte-app_1.0.0_amd64.deb     <-- Doppelklick zum Installieren
 └── appimage/
-    └── ernte-app_0.1.0_amd64.AppImage <-- Eigenständige Datei (portabel)
+    └── ernte-app_1.0.0_amd64.AppImage <-- Eigenständige Datei (portabel)
 ```
 
 ## 4. App starten
@@ -34,4 +34,4 @@ ernte-app/src-tauri/target/release/bundle/
 - **Option B**: Rechtsklick auf die `.AppImage`, unter *Eigenschaften > Zugriffsrechte* den Haken bei "Datei als Programm ausführen" setzen, und dann doppelklicken.
 
 > [!IMPORTANT]
-> **Daten-Migration**: Vergiss nicht, deine `historie-*.json` und `stammdaten.json` Dateien aus deinem Windows-Build-Ordner in denselben Ordner wie die App auf deinem Linux-System zu kopieren, um deine Daten zu behalten!
+> **Daten-Dateien**: Die `historie-*.json` und `stammdaten.json` Dateien aus dem Projektordner werden automatisch in das Installationspaket aufgenommen. Wenn du nach der Installation neuere Daten hast, kopiere sie in das Verzeichnis `/usr/lib/com.solawi.ernte/`.
