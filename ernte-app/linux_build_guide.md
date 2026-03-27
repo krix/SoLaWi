@@ -1,6 +1,11 @@
-# Linux Build Guide - SoLaWi App
+# Linux Build Guide - SoLaWi App v1.0.0
 
 Folge diesen Schritten, um die App auf deinem **Linux Mint 22 (Wilma)** oder einem anderen Ubuntu-basierten System zu bauen.
+
+## Voraussetzungen
+- Ubuntu 24.04 / Linux Mint 22 oder neuer
+- Internetzugang (für Downloads bei Ersteinrichtung)
+- Das Skript installiert automatisch: **Node.js 22 LTS**, **Rust** und alle System-Bibliotheken
 
 ## 1. Code vorbereiten
 Kopiere den gesamten Projektordner (`SoLaWi`) von deinem Windows-Rechner auf deinen Linux-Rechner (z.B. per USB-Stick oder Git).
@@ -14,9 +19,14 @@ chmod +x setup_linux.sh
 ```
 
 ### Was das Skript macht:
-- Installiert alle benötigten System-Bibliotheken (`libwebkit2gtk-4.1`, `libgtk-3`, etc.).
-- Installiert **Rust** und **Node.js**, falls diese noch nicht vorhanden sind.
-- Kompiliert das Frontend und baut die finalen Linux-Pakete.
+1. Installiert alle benötigten System-Bibliotheken (`libwebkit2gtk-4.1`, `libgtk-3`, etc.)
+2. Installiert **Node.js 22 LTS** über NodeSource (die Ubuntu/Mint-Pakete sind zu alt!)
+3. Installiert **Rust** via rustup, falls noch nicht vorhanden
+4. Löscht vorhandene `node_modules` (wichtig beim Plattformwechsel Windows → Linux)
+5. Kompiliert das Frontend und baut die finalen Linux-Pakete
+
+> [!WARNING]
+> **Wichtig**: Das Skript entfernt `node_modules` und `package-lock.json` automatisch, da diese bei einem Plattformwechsel von Windows auf Linux inkompatibel sind.
 
 ## 3. Pakete finden
 Sobald das Skript fertig ist, findest du deine Installationsdateien hier:

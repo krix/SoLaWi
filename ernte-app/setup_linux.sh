@@ -5,10 +5,14 @@
 
 set -e
 
-echo "--- Starte App-Setup für Linux Mint 22 ---"
+echo ""
+echo "========================================="
+echo "  SoLaWi Ernte-App – Linux Build v1.0.0"
+echo "========================================="
+echo ""
 
 # 1. System-Abhängigkeiten installieren
-echo "1. Installiere System-Bibliotheken (GTK, WebKit, etc.)..."
+echo "[1/6] Installiere System-Bibliotheken (GTK, WebKit, etc.)..."
 sudo apt update
 sudo apt install -y \
     libwebkit2gtk-4.1-dev \
@@ -19,36 +23,80 @@ sudo apt install -y \
     libssl-dev \
     libgtk-3-dev \
     libayatana-appindicator3-dev \
-    librsvg2-dev
+    librsvg2-dev \
+    libsoup-3.0-dev \
+    libjavascriptcoregtk-4.1-dev \
+    ca-certificates \
+    gnupg
 
-# 2. Rust installieren (falls nicht vorhanden)
+# 2. Node.js 22 LTS über NodeSource installieren (distro-Pakete sind zu alt)
+REQUIRED_NODE_MAJOR=22
+install_node() {
+    echo "[2/6] Installiere Node.js $REQUIRED_NODE_MAJOR LTS via NodeSource..."
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+        | sudo gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null || true
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$REQUIRED_NODE_MAJOR.x nodistro main" \
+        | sudo tee /etc/apt/sources.list.d/nodesource.list > /dev/null
+    sudo apt update
+    sudo apt install -y nodejs
+}
+
+if command -v node &> /dev/null; then
+    CURRENT_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
+    if [ "$CURRENT_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ]; then
+        echo "  Node.js $(node -v) ist zu alt (benötigt >= $REQUIRED_NODE_MAJOR)."
+        install_node
+    else
+        echo "[2/6] Node.js $(node -v) ist bereits installiert."
+    fi
+else
+    install_node
+fi
+
+echo "  Node: $(node -v)  npm: $(npm -v)"
+
+# 3. Rust installieren (falls nicht vorhanden)
 if ! command -v rustc &> /dev/null; then
-    echo "2. Installiere Rust (rustup)..."
+    echo "[3/6] Installiere Rust (rustup)..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source $HOME/.cargo/env
+    # shellcheck source=/dev/null
+    source "$HOME/.cargo/env"
 else
-    echo "2. Rust ist bereits installiert."
+    echo "[3/6] Rust ist bereits installiert: $(rustc --version)"
+    # Stelle sicher, dass cargo im PATH ist
+    if [ -f "$HOME/.cargo/env" ]; then
+        # shellcheck source=/dev/null
+        source "$HOME/.cargo/env"
+    fi
 fi
 
-# 3. Node.js und NPM prüfen
-if ! command -v npm &> /dev/null; then
-    echo "3. Installiere Node.js..."
-    sudo apt install -y nodejs npm
-else
-    echo "3. Node.js ist bereits installiert."
+# 4. Node-Abhängigkeiten installieren
+echo "[4/6] Installiere Node-Abhängigkeiten..."
+# Lösche node_modules bei Plattformwechsel (Windows → Linux)
+if [ -d "node_modules" ]; then
+    echo "  Entferne vorhandene node_modules (Plattformwechsel)..."
+    rm -rf node_modules
 fi
-
-# 4. App bauen
-echo "4. Installiere Node-Abhängigkeiten..."
+rm -f package-lock.json
 npm install
 
-echo "5. Baue das Frontend..."
+# 5. Frontend bauen
+echo "[5/6] Baue das Frontend..."
 npm run build
 
-echo "6. Baue das Tauri-Bundle (.deb & .AppImage)..."
+# 6. Tauri-Bundle bauen
+echo "[6/6] Baue das Tauri-Bundle (.deb & .AppImage)..."
 npm run tauri build
 
 echo ""
-echo "--- Build abgeschlossen! ---"
-echo "Du findest die Pakete im Ordner: src-tauri/target/release/bundle/"
-echo "Die .deb Datei kannst du einfach mit Doppelklick installieren."
+echo "========================================="
+echo "  Build abgeschlossen!"
+echo "========================================="
+echo ""
+echo "Pakete findest du hier:"
+echo "  src-tauri/target/release/bundle/deb/"
+echo "  src-tauri/target/release/bundle/appimage/"
+echo ""
+echo "Die .deb Datei kannst du mit Doppelklick installieren."
+echo ""
