@@ -280,6 +280,15 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
             <label style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.2rem' }}>Bis</label>
             <input type="date" className="input" style={{ padding: '0.2rem', fontSize: '0.9rem' }} value={endDate} onChange={e => setEndDate(e.target.value)} />
           </div>
+          {(startDate || endDate) && (
+            <button 
+              className="button outline" 
+              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', height: 'fit-content', alignSelf: 'flex-end', marginBottom: '4px' }}
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+            >
+              🔄 Filter zurücksetzen
+            </button>
+          )}
         </div>
       </div>
 
