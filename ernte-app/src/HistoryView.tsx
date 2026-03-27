@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { Depot } from './data';
-import { parseDate } from './logic';
+import { parseDate, convertToCSV, parseCSV } from './logic';
 
 interface DepotStat {
   kgSum: number;
@@ -13,14 +14,69 @@ interface DepotStat {
 }
 
 interface HistoryViewProps {
-  data: any[];
+  data: any[]; 
+  selectedYear: string;
   allDepots: Depot[];
+  onHistoryChange?: (newData: any[]) => void;
 }
 
-export default function HistoryView({ data, allDepots }: HistoryViewProps) {
+export default function HistoryView({ data, selectedYear, allDepots, onHistoryChange }: HistoryViewProps) {
   const [filterArticle, setFilterArticle] = useState<string>('Alle');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const saveHistory = async (year: string, updatedHistory: any[]) => {
+    const headers = ["Datum", "Depot", "Artikel", "GesamtMenge", "Ganze Anteile", "Halbe Anteile", "Einheit"];
+    let mdContent = headers.join('\t') + '\n';
+    
+    for (const row of updatedHistory) {
+      let ges = typeof row.gesamtMenge === 'number' && Number.isInteger(row.gesamtMenge) ? row.gesamtMenge.toString() : row.gesamtMenge.toFixed(4).replace(/\.?0+$/, '');
+      let ganzer = typeof row.ganzerAnteil === 'number' && Number.isInteger(row.ganzerAnteil) ? row.ganzerAnteil.toString() : row.ganzerAnteil.toFixed(4).replace(/\.?0+$/, '');
+      let halber = typeof row.halberAnteil === 'number' && Number.isInteger(row.halberAnteil) ? row.halberAnteil.toString() : row.halberAnteil.toFixed(4).replace(/\.?0+$/, '');
+
+      mdContent += `${row.datum}\t${row.depot}\t${row.artikel}\t${ges}\t${ganzer}\t${halber}\t${row.einheit}\n`;
+    }
+
+    const jsonContent = JSON.stringify(updatedHistory, null, 2);
+    try {
+      await invoke('sync_history', { year, mdContent, jsonContent });
+    } catch (e) {
+      console.error("Failed to save history:", e);
+      alert("Fehler beim Speichern der Historie.");
+    }
+  };
+
+  const handleExportCSV = async () => {
+    const csv = convertToCSV(data);
+    const fileName = `historie-${selectedYear}.csv`;
+    try {
+      await invoke('save_csv_file', { content: csv, defaultName: fileName });
+    } catch (e) {
+      console.error("Failed to export CSV:", e);
+      alert("Fehler beim CSV Export.");
+    }
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const csv = event.target?.result as string;
+      const imported = parseCSV(csv);
+      if (imported.length > 0) {
+        if (window.confirm(`${imported.length} Einträge in das Erntejahr ${selectedYear} importieren?`)) {
+           const updated = [...data, ...imported];
+           onHistoryChange?.(updated);
+           await saveHistory(selectedYear, updated);
+        }
+      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
 
   const baseFilteredData = useMemo(() => {
     if (!startDate && !endDate) return data;
@@ -178,11 +234,28 @@ export default function HistoryView({ data, allDepots }: HistoryViewProps) {
     <div className="glass-panel animate-in" style={{ padding: '2rem', width: '100%', maxWidth: '1000px', margin: '0 auto' }}>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ color: 'var(--color-primary)', marginBottom: '0.4rem' }}>Erweiterte Verteilungsstatistiken</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <h2 style={{ color: 'var(--color-primary)', margin: 0 }}>Erweiterte Verteilungsstatistiken ({selectedYear})</h2>
+          </div>
           <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-            Auswertung von <strong>{baseFilteredData.length}</strong> historischen Lieferscheinen.
+            Auswertung von <strong>{baseFilteredData.length}</strong> historischen Daten.
           </p>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+            <button className="button outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={handleExportCSV}>
+              📥 CSV Export
+            </button>
+            <button className="button outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => fileInputRef.current?.click()}>
+              📤 CSV Import
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              accept=".csv" 
+              onChange={handleImportCSV} 
+            />
+          </div>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>

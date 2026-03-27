@@ -1,9 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 import { UNIQUE_ARTICLES, DEPOTS, ALL_DEPOTS, Article, Depot } from './data';
-import { calculateDistribution, Distribution, getFairnessRatio } from './logic';
-import historieDataImport from './historie.json';
+import { calculateDistribution, Distribution, getFairnessRatio, getHarvestYear } from './logic';
 import HistoryView from './HistoryView';
 import MasterDataView from './MasterDataView';
 
@@ -21,7 +20,47 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 function App() {
   const [activeTab, setActiveTab] = useState<'calculator' | 'history' | 'masterdata'>('calculator');
   const [distributions, setDistributions] = useState<Distribution[]>([]);
-  const [historyData, setHistoryData] = useState<any[]>(historieDataImport);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('');
+
+  // Fetch available years and set initial selected year
+  useEffect(() => {
+    const initYears = async () => {
+      try {
+        const years = await invoke<string[]>('list_history_years');
+        setAvailableYears(years);
+        if (years.length > 0) {
+          const today = new Date();
+          const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
+          const currentHarvestYear = getHarvestYear(todayStr);
+          if (years.includes(currentHarvestYear)) {
+            setSelectedYear(currentHarvestYear);
+          } else {
+            setSelectedYear(years[0]);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to list history years:", e);
+      }
+    };
+    initYears();
+  }, []);
+
+  // Load history whenever selectedYear changes
+  useEffect(() => {
+    if (selectedYear) {
+      const loadData = async () => {
+        try {
+          const raw = await invoke<string>('load_history', { year: selectedYear });
+          setHistoryData(JSON.parse(raw));
+        } catch (e) {
+          console.error("Failed to load history for year:", selectedYear, e);
+        }
+      };
+      loadData();
+    }
+  }, [selectedYear]);
 
   // Editable master data — loaded from localStorage, falls back to data.ts defaults
   const [editableArticles, setEditableArticlesRaw] = useState<Article[]>(
@@ -188,9 +227,10 @@ function App() {
     }
 
     const jsonContent = JSON.stringify(updatedHistory, null, 2);
+    const year = getHarvestYear(todayStr);
 
     try {
-        await invoke('sync_history', { mdContent, jsonContent });
+        await invoke('sync_history', { year, mdContent, jsonContent });
     } catch (e) {
         console.error("Failed to sync history:", e);
         alert("Achtung: Konnte die Historie nicht dauerhaft speichern! Läuft das Backend?");
@@ -294,25 +334,39 @@ function App() {
           <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung & Ernteplanung</p>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <button 
-            className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('calculator')}
-          >
-            Aktuelle Verteilung
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            Historie &amp; Statistik
-          </button>
-          <button 
-            className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
-            onClick={() => setActiveTab('masterdata')}
-          >
-            ⚙️ Stammdaten
-          </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <button 
+              className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
+              onClick={() => setActiveTab('calculator')}
+            >
+              Aktuelle Verteilung
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => setActiveTab('history')}
+            >
+              Historie &amp; Statistik
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
+              onClick={() => setActiveTab('masterdata')}
+            >
+              ⚙️ Stammdaten
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-light)' }}>Erntejahr:</span>
+            <select 
+              className="input" 
+              style={{ width: 'auto', padding: '2px 8px', fontSize: '0.9rem', fontWeight: 600, border: 'none', background: 'transparent' }}
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value)}
+            >
+              {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
         </div>
 
         {activeTab === 'calculator' ? (
@@ -497,6 +551,8 @@ function App() {
       {activeTab === 'history' && (
         <HistoryView
           data={historyData}
+          selectedYear={selectedYear}
+          onHistoryChange={setHistoryData}
           allDepots={[
             ...editableDepots,
             // Include historic depots from data.ts for backward compatibility with old history entries

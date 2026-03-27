@@ -147,3 +147,102 @@ export function getFairnessRatio(artikel: string, historieData: any[], depots: D
     }
     return result;
 }
+
+/**
+ * Determines the harvest year for a given date string (DD.MM.YYYY).
+ * A harvest year starts on April 1st.
+ */
+export function getHarvestYear(dateStr: string): string {
+  const parts = dateStr.split('.');
+  if (parts.length === 3) {
+    const m = parseInt(parts[1], 10);
+    const y = parseInt(parts[2], 10);
+    const yearNum = y < 100 ? y + 2000 : y;
+    const harvestYear = (m < 4) ? yearNum - 1 : yearNum;
+    return harvestYear.toString();
+  }
+  // Fallback to current harvest year
+  const now = new Date();
+  const m = now.getMonth() + 1;
+  const y = now.getFullYear();
+  return (m < 4 ? y - 1 : y).toString();
+}
+
+/**
+ * Converts history data to CSV format.
+ */
+export function convertToCSV(data: any[]): string {
+  if (data.length === 0) return "";
+  const headers = ["Datum", "Depot", "Artikel", "GesamtMenge", "Ganze Anteile", "Halbe Anteile", "Einheit"];
+  const keys = ["datum", "depot", "artikel", "gesamtMenge", "ganzerAnteil", "halberAnteil", "einheit"];
+  
+  const rows = data.map(obj => 
+    keys.map(key => {
+      let val = obj[key] ?? "";
+      
+      // Handle decimals for German Excel (replace . with ,)
+      if (typeof val === 'number') {
+        val = val.toString().replace('.', ',');
+      } else if (typeof val === 'string') {
+        if (val.includes(';') || val.includes('"') || val.includes('\n')) {
+          val = `"${val.replace(/"/g, '""')}"`;
+        }
+      }
+      return val;
+    }).join(';')
+  );
+  return [headers.join(';'), ...rows].join('\n');
+}
+
+/**
+ * Parses CSV format back to history data.
+ */
+export function parseCSV(csv: string): any[] {
+  const lines = csv.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (lines.length < 2) return [];
+  
+  const parseLine = (line: string) => {
+    const result = [];
+    let cur = "";
+    let inQuotes = false;
+    // Support both comma and semicolon
+    const separator = line.includes(';') && !line.includes(',') ? ';' : ',';
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i+1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === separator && !inQuotes) {
+        result.push(cur);
+        cur = "";
+      } else {
+        cur += char;
+      }
+    }
+    result.push(cur);
+    return result;
+  };
+
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const values = parseLine(line);
+    const obj: any = {};
+    headers.forEach((header, i) => {
+      let val: any = values[i]?.trim();
+      if (val === undefined) val = "";
+      
+      // Convert specific fields to numbers
+      if (["gesamtMenge", "ganzerAnteil", "halberAnteil"].includes(header)) {
+         const num = Number(val.replace(',', '.'));
+         val = isNaN(num) ? 0 : num;
+      }
+      obj[header] = val;
+    });
+    return obj;
+  });
+}
