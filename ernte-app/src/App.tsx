@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 import { UNIQUE_ARTICLES, DEPOTS, ALL_DEPOTS, Article, Depot } from './data';
-import { calculateDistribution, Distribution, getFairnessRatio, getHarvestYear } from './logic';
+import { calculateDistribution, calculatePieceRemainderAllocation, Distribution, getFairnessRatio, getHarvestYear } from './logic';
 import HistoryView from './HistoryView';
 import MasterDataView from './MasterDataView';
 
@@ -24,23 +24,13 @@ function App() {
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('');
 
-  // Fetch available years and set initial selected year
+  // Fetch available years and always load ALL history on startup
   useEffect(() => {
     const initYears = async () => {
       try {
         const years = await invoke<string[]>('list_history_years');
-        const augmented = ["Alle", ...years];
-        setAvailableYears(augmented);
-        if (years.length > 0) {
-          const today = new Date();
-          const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
-          const currentHarvestYear = getHarvestYear(todayStr);
-          if (years.includes(currentHarvestYear)) {
-            setSelectedYear(currentHarvestYear);
-          } else {
-            setSelectedYear(augmented[0]);
-          }
-        }
+        setAvailableYears(["Alle", ...years]);
+        setSelectedYear("Alle");
       } catch (e) {
         console.error("Failed to list history years:", e);
       }
@@ -135,6 +125,18 @@ function App() {
     }
     return map;
   }, [distributions, editableDepots]);
+
+  const getRemainderAllocation = (dist: Distribution) => {
+    if (dist.unit !== 'Stück') {
+      return {
+        allocationsByDepot: {},
+        distributedAmount: 0,
+        openRemainder: dist.remainder,
+        rounds: 0
+      };
+    }
+    return calculatePieceRemainderAllocation(dist.remainder, dist.geschenkeDepotKuerzel, dist.excludedDepots, editableDepots);
+  };
   
   const handleAddHarvest = () => {
     if (typeof amount !== 'number' || amount <= 0) return;
@@ -148,7 +150,7 @@ function App() {
     }
     
     const newDist = calculateDistribution(article.name, article.unit, amount, [], editableDepots);
-    setDistributions([...distributions, newDist]);
+    setDistributions(prev => [newDist, ...prev]);
     setAmount('');
   };
 
@@ -168,29 +170,49 @@ function App() {
         
         let recalcDist = calculateDistribution(dist.articleName, dist.unit, dist.totalHarvested, newExcluded, editableDepots);
         recalcDist.id = dist.id; 
-        recalcDist.geschenkeDepotKuerzel = dist.geschenkeDepotKuerzel; 
-        if (newExcluded.includes(recalcDist.geschenkeDepotKuerzel || '')) {
-            recalcDist.geschenkeDepotKuerzel = null;
-        }
+        recalcDist.geschenkeDepotKuerzel = (
+          recalcDist.unit === 'Stück' && recalcDist.remainder > 0
+            ? dist.geschenkeDepotKuerzel.filter(kuerzel => !newExcluded.includes(kuerzel))
+            : []
+        );
         return recalcDist;
       }
       return dist;
     }));
   };
 
-  const handleSelectGeschenk = (distId: string, depotKuerzel: string) => {
+  const handleSelectGeschenk = (distId: string, depotKuerzel: string, shouldSelect: boolean) => {
     setDistributions(distributions.map(dist => {
       if (dist.id === distId) {
-        return { ...dist, geschenkeDepotKuerzel: depotKuerzel };
+        const nextSelection = shouldSelect
+          ? Array.from(new Set([...dist.geschenkeDepotKuerzel, depotKuerzel]))
+          : dist.geschenkeDepotKuerzel.filter(k => k !== depotKuerzel);
+        return { ...dist, geschenkeDepotKuerzel: nextSelection };
       }
       return dist;
     }));
   };
 
+  const handleSelectAllGeschenkDepots = (distId: string) => {
+    setDistributions(distributions.map(dist => {
+      if (dist.id !== distId) return dist;
+
+      const selectableDepots = dist.results
+        .filter(res => !res.isExcluded)
+        .map(res => editableDepots.find(d => d.kuerzel === res.depotKuerzel))
+        .filter((depot): depot is Depot => !!depot && depot.gesamtHalbeAnteile > 0)
+        .map(depot => depot.kuerzel);
+
+      return { ...dist, geschenkeDepotKuerzel: selectableDepots };
+    }));
+  };
+
+  const handleClearGeschenkDepots = (distId: string) => {
+    setDistributions(distributions.map(dist => dist.id === distId ? { ...dist, geschenkeDepotKuerzel: [] } : dist));
+  };
+
   const handleDeleteDistribution = (distId: string) => {
-    if (window.confirm("Diese Verteilung wirklich aus der Liste entfernen?")) {
-      setDistributions(distributions.filter(d => d.id !== distId));
-    }
+    setDistributions(distributions.filter(d => d.id !== distId));
   };
 
   const handleUpdateAmount = (distId: string, newAmount: number) => {
@@ -199,10 +221,11 @@ function App() {
       if (dist.id === distId) {
         let recalcDist = calculateDistribution(dist.articleName, dist.unit, newAmount, dist.excludedDepots, editableDepots);
         recalcDist.id = dist.id; 
-        recalcDist.geschenkeDepotKuerzel = dist.geschenkeDepotKuerzel; 
-        if (recalcDist.remainder <= 0 || recalcDist.excludedDepots.includes(recalcDist.geschenkeDepotKuerzel || '')) {
-            recalcDist.geschenkeDepotKuerzel = null;
-        }
+        recalcDist.geschenkeDepotKuerzel = (
+          recalcDist.unit === 'Stück' && recalcDist.remainder > 0
+            ? dist.geschenkeDepotKuerzel.filter(kuerzel => !recalcDist.excludedDepots.includes(kuerzel))
+            : []
+        );
         return recalcDist;
       }
       return dist;
@@ -232,12 +255,11 @@ function App() {
           const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
           const isExcluded = res?.isExcluded;
           const calculatedAmount = res?.calculatedAmount || 0;
-          const getsGift = dist.geschenkeDepotKuerzel === depot.kuerzel;
+          const remainderAllocation = getRemainderAllocation(dist);
+          const allocatedRemainder = remainderAllocation.allocationsByDepot[depot.kuerzel] || 0;
           
           let finalTotalAmount = calculatedAmount;
-          if (getsGift && dist.remainder > 0) {
-              finalTotalAmount += dist.remainder;
-          }
+          finalTotalAmount += allocatedRemainder;
 
           if (!isExcluded && finalTotalAmount > 0) {
              let halberAnteilVal = finalTotalAmount / depot.gesamtHalbeAnteile;
@@ -261,19 +283,8 @@ function App() {
     const jsonForSync = updatedHistory.filter(row => getHarvestYear(row.datum) === year);
     const jsonContent = JSON.stringify(jsonForSync, null, 2);
 
-    // Regenerate MD content for just that year
-    const headers = ["Datum", "Depot", "Artikel", "GesamtMenge", "Ganze Anteile", "Halbe Anteile", "Einheit"];
-    let mdContent = headers.join('\t') + '\n';
-    for (const row of jsonForSync) {
-      let ges = typeof row.gesamtMenge === 'number' && Number.isInteger(row.gesamtMenge) ? row.gesamtMenge.toString() : row.gesamtMenge.toFixed(4).replace(/\.?0+$/, '');
-      let ganzer = typeof row.ganzerAnteil === 'number' && Number.isInteger(row.ganzerAnteil) ? row.ganzerAnteil.toString() : row.ganzerAnteil.toFixed(4).replace(/\.?0+$/, '');
-      let halber = typeof row.halberAnteil === 'number' && Number.isInteger(row.halberAnteil) ? row.halberAnteil.toString() : row.halberAnteil.toFixed(4).replace(/\.?0+$/, '');
-
-      mdContent += `${row.datum}\t${row.depot}\t${row.artikel}\t${ges}\t${ganzer}\t${halber}\t${row.einheit}\n`;
-    }
-
     try {
-        await invoke('sync_history', { year, mdContent, jsonContent });
+        await invoke('sync_history', { year, jsonContent });
     } catch (e) {
         console.error("Failed to sync history:", e);
         alert("Achtung: Konnte die Historie nicht dauerhaft speichern! Läuft das Backend?");
@@ -292,8 +303,14 @@ function App() {
         {editableDepots.map(depot => {
           const validDistributions = distributions.filter(d => {
              const res = d.results.find(r => r.depotKuerzel === depot.kuerzel);
-             const getsGift = d.geschenkeDepotKuerzel === depot.kuerzel && d.remainder > 0;
-             return (res && !res.isExcluded && res.calculatedAmount > 0) || getsGift;
+             const allocation = getRemainderAllocation(d);
+             const allocatedRemainder = allocation.allocationsByDepot[depot.kuerzel] || 0;
+             return (res && !res.isExcluded && res.calculatedAmount > 0) || allocatedRemainder > 0;
+          })
+          // Stück-Artikel zuerst, dann kg-Artikel
+          .sort((a, b) => {
+            if (a.unit === b.unit) return 0;
+            return a.unit === 'Stück' ? -1 : 1;
           });
 
           return (
@@ -315,51 +332,29 @@ function App() {
                 <tbody>
                   {validDistributions.map(dist => {
                     const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
-                    const isGiftOnly = (!res || res.isExcluded || res.calculatedAmount <= 0);
-                    const getsGift = dist.geschenkeDepotKuerzel === depot.kuerzel && dist.remainder > 0;
+                    const allocation = getRemainderAllocation(dist);
+                    const allocatedRemainder = allocation.allocationsByDepot[depot.kuerzel] || 0;
                     
                     const unit = dist.unit;
-                    let totalDepotAmount = isGiftOnly ? 0 : (res?.calculatedAmount || 0);
+                    const totalDepotAmount = (res && !res.isExcluded ? res.calculatedAmount : 0) + allocatedRemainder;
                     
-                    let perHalb: string | number = isGiftOnly ? 0 : totalDepotAmount / depot.gesamtHalbeAnteile;
-                    let perGanz: string | number = isGiftOnly ? 0 : (perHalb as number) * 2;
-                    let amountText = `${totalDepotAmount} ${unit}`;
+                    const perHalbNum = totalDepotAmount / depot.gesamtHalbeAnteile;
+                    const perGanzNum = perHalbNum * 2;
 
-                    if (unit === 'Stück') {
-                       perHalb = (perHalb as number).toFixed(2);
-                       perGanz = (perGanz as number).toFixed(2);
-                    } else {
-                       perHalb = (perHalb as number).toFixed(2);
-                       perGanz = (perGanz as number).toFixed(2);
-                    }
+                    const fmt = (v: number) => unit === 'Stück' ? Math.round(v).toString() : v.toFixed(2);
+                    const fmtAmount = unit === 'Stück' ? Math.round(totalDepotAmount).toString() : totalDepotAmount.toFixed(2);
 
-                    if (getsGift) {
-                       amountText += ` (+ ${dist.remainder} ${unit} Geschenk!)`;
-                    }
-                    
                     return (
                       <tr key={dist.id}>
                         <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{dist.articleName}</strong></td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{amountText}</td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{isGiftOnly ? '-' : `${perHalb} ${unit}`}</td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{isGiftOnly ? '-' : `${perGanz} ${unit}`}</td>
+                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmtAmount} {unit}</td>
+                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmt(perHalbNum)} {unit}</td>
+                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmt(perGanzNum)} {unit}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-
-              {distributions.filter(d => d.geschenkeDepotKuerzel === depot.kuerzel && d.remainder > 0).length > 0 && (
-                <div style={{ padding: '15px', border: '2px dashed #666', borderRadius: '8px', background: '#f9f9f9' }}>
-                   <h2>🎁 Geschenkekiste!</h2>
-                   <p>Dieses Depot erhält heute Reste, die nicht einteilbar waren:</p>
-                   <ul>
-                     {distributions.filter(d => d.geschenkeDepotKuerzel === depot.kuerzel && d.remainder > 0).map(d => (
-                       <li key={d.id}><strong>{d.remainder} {d.unit} {d.articleName}</strong></li>
-                     ))}
-                   </ul>
-                </div>
-              )}
 
               {validDistributions.length === 0 && <p>Keine Ernte für dieses Depot erfasst.</p>}
             </div>
@@ -374,29 +369,29 @@ function App() {
       <header className="nav-header no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ color: 'var(--color-primary)' }}>SoLaWi App</h1>
-          <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung & Ernteplanung</p>
+          <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <button 
-              className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
-              onClick={() => setActiveTab('calculator')}
-            >
-              Aktuelle Verteilung
-            </button>
-            <button 
-              className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => setActiveTab('history')}
-            >
-              Historie &amp; Statistik
-            </button>
-            <button 
-              className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
-              onClick={() => setActiveTab('masterdata')}
-            >
-              ⚙️ Stammdaten
-            </button>
+               className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
+               onClick={() => setActiveTab('calculator')}
+             >
+               🌾 Aktuelle Verteilung
+             </button>
+             <button 
+               className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
+               onClick={() => setActiveTab('history')}
+             >
+               📊 Historie &amp; Statistik
+             </button>
+             <button 
+               className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
+               onClick={() => setActiveTab('masterdata')}
+             >
+               ⚙️ Stammdaten
+             </button>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
@@ -414,8 +409,8 @@ function App() {
 
         {activeTab === 'calculator' ? (
           <button className="button" onClick={handlePrint} disabled={distributions.length === 0}>
-             🖨️ Verteilliste Drucken
-          </button>
+              🖨️ Verteilliste drucken
+           </button>
         ) : (
           <div style={{ width: '200px' }}></div>
         )}
@@ -427,7 +422,7 @@ function App() {
           {/* Sidebar / Form */}
           <div>
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-              <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>Neue Ernte eintragen</h2>
+              <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>🌱 Neue Ernte eintragen</h2>
               <div className="form-group">
                 <label>Artikel auswählen</label>
                 <select 
@@ -449,13 +444,14 @@ function App() {
                   value={amount}
                   min="0"
                   step="any"
-                  onChange={e => setAmount(Number(e.target.value) || '')} 
+                  onChange={e => setAmount(Number(e.target.value) || '')}
+                  onKeyDown={e => e.key === 'Enter' && handleAddHarvest()}
                 />
               </div>
               
               <button className="button" style={{ width: '100%', marginTop: '0.5rem' }} onClick={handleAddHarvest}>
-                Hinzufügen
-              </button>
+                 ＋ Zur Verteilung hinzufügen
+               </button>
             </div>
             </div>
           
@@ -463,12 +459,15 @@ function App() {
           <div>
             {distributions.length === 0 && (
               <div className="glass-panel" style={{ padding: '4rem', textAlign: 'center', color: 'var(--color-text)' }}>
-                <h3>🌾 Keine Artikel hinzugefügt.</h3>
+                <h3>🌾 Noch keine Artikel hinzugefügt</h3>
                 <p style={{ color: 'var(--color-text-light)' }}>Wähle links einen Artikel und eine Menge, um die Verteilung zu berechnen.</p>
               </div>
             )}
             
-            {distributions.map((dist, idx) => (
+            {distributions.map((dist, idx) => {
+              const remainderAllocation = getRemainderAllocation(dist);
+
+              return (
               <div key={dist.id} className="glass-panel animate-in" style={{ padding: '1.5rem', marginBottom: '1.5rem', animationDelay: `${idx * 0.1}s` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div>
@@ -501,38 +500,67 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                     {dist.unit === 'Stück' && dist.sharePerHalb < 1 && (
                       <div style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)', fontSize: '0.85rem', maxWidth: '250px' }}>
-                         ⚠️ <strong>Warnung:</strong> Menge reicht nicht aus (0 Stück pro Person). Bitte Depots unten ausschließen!
-                      </div>
-                    )}
+                         ⚠️ <strong>Achtung:</strong> Die Menge reicht nicht für mindestens 1 Stück pro Person. Bitte Depots ausschließen!
+                       </div>
+                     )}
 
-                    {dist.remainder > 0 && (
-                      <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)' }}>
-                        <div style={{ fontWeight: 500, color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                          🎁 Geschenkekiste ({dist.remainder} {dist.unit} übrig)
-                        </div>
-                        <select 
-                          className="input" 
-                          style={{ padding: '0.4rem', fontSize: '0.85rem' }}
-                          value={dist.geschenkeDepotKuerzel || ''}
-                          onChange={e => handleSelectGeschenk(dist.id, e.target.value)}
-                        >
-                          <option value="">-- Depot wählen --</option>
-                          {editableDepots.map(d => (
-                            <option key={d.kuerzel} value={d.kuerzel}>{d.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                     {dist.remainder > 0 && (
+                       <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)' }}>
+                         <div style={{ fontWeight: 500, color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                           📦 Rest: {dist.remainder} {dist.unit} übrig
+                         </div>
+                         {dist.unit === 'Stück' ? (
+                           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                             Wähle unten Depots aus, auf die der Rest gleichmäßig verteilt wird (in vollen halben-Anteil-Runden).
+                             <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                               <button
+                                 type="button"
+                                 className="button"
+                                 style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                                 onClick={() => handleSelectAllGeschenkDepots(dist.id)}
+                               >
+                                 ✓ Alle auswählen
+                               </button>
+                               <button
+                                 type="button"
+                                 className="button"
+                                 style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                                 onClick={() => handleClearGeschenkDepots(dist.id)}
+                               >
+                                 ✕ Auswahl aufheben
+                               </button>
+                             </div>
+                             <div style={{ marginTop: '0.35rem' }}>
+                               Verteilt: <strong>{remainderAllocation.distributedAmount} {dist.unit}</strong>
+                               {remainderAllocation.openRemainder > 0 && (
+                                 <span style={{ color: 'var(--color-danger)', marginLeft: '0.5rem' }}>
+                                   (nicht verteilbar: {remainderAllocation.openRemainder} {dist.unit})
+                                 </span>
+                               )}
+                             </div>
+                             {dist.geschenkeDepotKuerzel.length > 0 && remainderAllocation.rounds === 0 && (
+                               <div style={{ marginTop: '0.35rem', color: 'var(--color-danger)' }}>
+                                 ⚠️ Keine volle Runde möglich – wähle weniger oder andere Depots.
+                               </div>
+                             )}
+                           </div>
+                         ) : (
+                           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                             kg-Produkte werden restlos verteilt – hier ist keine Resteverteilung nötig.
+                           </div>
+                         )}
+                       </div>
+                     )}
 
-                    <button 
-                      onClick={() => handleDeleteDistribution(dist.id)}
-                      title="Verteilung löschen"
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '0.4rem', opacity: 0.6, transition: 'var(--transition)' }}
-                      onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                      onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-                    >
-                      🗑️
-                    </button>
+                     <button 
+                       onClick={() => handleDeleteDistribution(dist.id)}
+                       title="Artikel aus Verteilung entfernen"
+                       style={{ background: 'transparent', border: '1px solid transparent', cursor: 'pointer', fontSize: '0.85rem', padding: '0.35rem 0.5rem', borderRadius: '6px', opacity: 0.5, transition: 'var(--transition)', color: 'var(--color-danger)' }}
+                       onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'var(--color-danger)'; }}
+                       onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.borderColor = 'transparent'; }}
+                     >
+                       ✕ Entfernen
+                     </button>
                   </div>
                 </div>
                 
@@ -542,8 +570,8 @@ function App() {
                       <tr>
                         <th>Aktiv</th>
                         <th>Depot</th>
-                        <th>Berechnete Menge ({dist.unit})</th>
-                        {dist.remainder > 0 && <th>Geschenkekiste</th>}
+                        <th>Menge ({dist.unit})</th>
+                        {dist.unit === 'Stück' && dist.remainder > 0 && <th>Rest zuteilen</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -568,16 +596,31 @@ function App() {
                           <td>
                             {res.depotKuerzel} {indicator}
                             <span style={{ marginLeft: '0.5rem', color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
-                               ({matchedDepot?.gesamtHalbeAnteile} halbe Anteile)
-                            </span>
-                            {res.isExcluded && <i style={{marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-danger)'}}>(Ausgeschlossen)</i>}
+                               ({matchedDepot?.gesamtHalbeAnteile} halbe Ant.)
+                             </span>
+                             {res.isExcluded && <i style={{marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-danger)'}}>(ausgeschl.)</i>}
                           </td>
                           <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
                             {res.isExcluded ? '-' : res.calculatedAmount} 
                           </td>
-                          {dist.remainder > 0 && (
+                          {dist.unit === 'Stück' && dist.remainder > 0 && (
                             <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
-                              {dist.geschenkeDepotKuerzel === res.depotKuerzel ? `+ ${dist.remainder}` : ''}
+                              {!res.isExcluded && (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={dist.geschenkeDepotKuerzel.includes(res.depotKuerzel)}
+                                    onChange={e => handleSelectGeschenk(dist.id, res.depotKuerzel, e.target.checked)}
+                                    style={{ cursor: 'pointer', accentColor: 'var(--color-danger)' }}
+                                  />
+                                  <span>
+                                    {remainderAllocation.allocationsByDepot[res.depotKuerzel]
+                                      ? `+ ${remainderAllocation.allocationsByDepot[res.depotKuerzel]}`
+                                      : ''}
+                                  </span>
+                                </label>
+                              )}
+                              {res.isExcluded && '-'}
                             </td>
                           )}
                         </tr>
@@ -586,7 +629,7 @@ function App() {
                   </table>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}

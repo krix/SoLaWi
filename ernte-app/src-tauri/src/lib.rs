@@ -3,12 +3,63 @@ use std::path::{Path, PathBuf};
 
 use tauri_plugin_dialog::DialogExt;
 
-// Helper to get the directory of the executable
+/// Checks whether a directory contains any history or master-data files.
+fn contains_data_files(dir: &Path) -> bool {
+    fs::read_dir(dir)
+        .map(|entries| {
+            entries.filter_map(|e| e.ok()).any(|e| {
+                let name = e.file_name().into_string().unwrap_or_default();
+                (name.starts_with("historie-") && name.ends_with(".json"))
+                    || name == "stammdaten.json"
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Resolves the data directory by searching upwards from the executable
+/// (handles dev-mode where the exe is inside target/debug/) and also
+/// checks the current working directory.  Prefers the highest-level
+/// (outermost) directory that contains data files so that in dev-mode
+/// the workspace root is chosen over target/debug/ which may only hold
+/// a partial copy.  Falls back to the exe directory for fresh installs.
 fn get_base_path() -> PathBuf {
-    std::env::current_exe()
+    let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| PathBuf::from("."))
+        .unwrap_or_else(|| PathBuf::from("."));
+
+    // Walk upwards from exe directory and remember every directory that
+    // contains data files.  The last (= highest / outermost) match wins.
+    let mut best_match: Option<PathBuf> = None;
+    let mut candidate = exe_dir.clone();
+    for _ in 0..6 {
+        if contains_data_files(&candidate) {
+            best_match = Some(candidate.clone());
+        }
+        match candidate.parent() {
+            Some(parent) => candidate = parent.to_path_buf(),
+            None => break,
+        }
+    }
+
+    if let Some(path) = best_match {
+        return path;
+    }
+
+    // Also check current working directory and its parent
+    if let Ok(cwd) = std::env::current_dir() {
+        if contains_data_files(&cwd) {
+            return cwd;
+        }
+        if let Some(parent) = cwd.parent() {
+            if contains_data_files(&parent.to_path_buf()) {
+                return parent.to_path_buf();
+            }
+        }
+    }
+
+    // Fallback: exe directory (fresh install, no existing data)
+    exe_dir
 }
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -34,12 +85,10 @@ async fn save_csv_file(handle: tauri::AppHandle, content: String, default_name: 
 }
 
 #[tauri::command]
-fn sync_history(year: &str, md_content: &str, json_content: &str) -> Result<(), String> {
+fn sync_history(year: &str, json_content: &str) -> Result<(), String> {
     let base = get_base_path();
-    let md_path = base.join(format!("HISTORIE-{}.MD", year));
     let json_path = base.join(format!("historie-{}.json", year));
     
-    fs::write(md_path, md_content).map_err(|e| e.to_string())?;
     fs::write(json_path, json_content).map_err(|e| e.to_string())?;
     
     Ok(())

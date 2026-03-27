@@ -14,8 +14,15 @@ export interface Distribution {
   results: DistributionResult[];
   remainder: number;        // Unallocated remainder (pieces)
   excludedDepots: string[];
-  geschenkeDepotKuerzel: string | null; // Depot receiving the remainder
+  geschenkeDepotKuerzel: string[]; // Depots selected for remainder distribution
   sharePerHalb: number;     // Amount equivalent to one half-share
+}
+
+export interface PieceRemainderAllocation {
+  allocationsByDepot: Record<string, number>;
+  distributedAmount: number;
+  openRemainder: number;
+  rounds: number;
 }
 
 /**
@@ -52,11 +59,11 @@ export function calculateDistribution(articleName: string, unit: UnitType, amoun
     let calculatedAmount = 0;
 
     if (!isExcluded && effectiveTotalAnteile > 0) {
-      const exact = getExactShare(amount, depot.gesamtHalbeAnteile, effectiveTotalAnteile);
-      
       if (unit === 'Stück') {
-        calculatedAmount = Math.floor(exact);
+        // Ganzes Vielfaches der halben Anteile, damit niemand ein Stück teilen muss
+        calculatedAmount = sharePerHalb * depot.gesamtHalbeAnteile;
       } else {
+        const exact = getExactShare(amount, depot.gesamtHalbeAnteile, effectiveTotalAnteile);
         calculatedAmount = Math.round(exact * 100) / 100;
       }
       allocated += calculatedAmount;
@@ -74,8 +81,16 @@ export function calculateDistribution(articleName: string, unit: UnitType, amoun
   if (unit === 'Stück') {
     remainder = amount - allocated;
   } else {
-    remainder = Math.round((amount - allocated) * 100) / 100;
-    if (Math.abs(remainder) < 0.01) remainder = 0;
+    // kg wird restlos verteilt – Rundungsdifferenz geht ans letzte inkludierte Depot
+    const roundingError = Math.round((amount - allocated) * 100) / 100;
+    if (Math.abs(roundingError) >= 0.01 && includedDepots.length > 0) {
+      const lastIncluded = includedDepots[includedDepots.length - 1];
+      const lastResult = results.find(r => r.depotKuerzel === lastIncluded.kuerzel);
+      if (lastResult) {
+        lastResult.calculatedAmount = Math.round((lastResult.calculatedAmount + roundingError) * 100) / 100;
+      }
+    }
+    remainder = 0;
   }
 
   return { 
@@ -86,8 +101,75 @@ export function calculateDistribution(articleName: string, unit: UnitType, amoun
     results, 
     remainder, 
     excludedDepots,
-    geschenkeDepotKuerzel: null,
+    geschenkeDepotKuerzel: [],
     sharePerHalb
+  };
+}
+
+/**
+ * Distributes piece remainders in full "half-share rounds" across selected depots.
+ * One round means each selected depot gets exactly its amount of half-shares.
+ */
+export function calculatePieceRemainderAllocation(
+  remainder: number,
+  selectedDepotKuerzel: string[],
+  excludedDepots: string[],
+  depots: Depot[]
+): PieceRemainderAllocation {
+  if (remainder <= 0 || selectedDepotKuerzel.length === 0) {
+    return {
+      allocationsByDepot: {},
+      distributedAmount: 0,
+      openRemainder: remainder,
+      rounds: 0
+    };
+  }
+
+  const seen = new Set<string>();
+  const selectedDepots = selectedDepotKuerzel
+    .filter(kuerzel => {
+      if (seen.has(kuerzel)) return false;
+      seen.add(kuerzel);
+      return true;
+    })
+    .map(kuerzel => depots.find(d => d.kuerzel === kuerzel))
+    .filter((depot): depot is Depot => !!depot)
+    .filter(depot => !excludedDepots.includes(depot.kuerzel) && depot.gesamtHalbeAnteile > 0);
+
+  const totalHalbeAnteile = selectedDepots.reduce((sum, depot) => sum + depot.gesamtHalbeAnteile, 0);
+  if (totalHalbeAnteile <= 0) {
+    return {
+      allocationsByDepot: {},
+      distributedAmount: 0,
+      openRemainder: remainder,
+      rounds: 0
+    };
+  }
+
+  const rounds = Math.floor(remainder / totalHalbeAnteile);
+  if (rounds <= 0) {
+    return {
+      allocationsByDepot: {},
+      distributedAmount: 0,
+      openRemainder: remainder,
+      rounds: 0
+    };
+  }
+
+  const allocationsByDepot: Record<string, number> = {};
+  let distributedAmount = 0;
+
+  for (const depot of selectedDepots) {
+    const amountForDepot = rounds * depot.gesamtHalbeAnteile;
+    allocationsByDepot[depot.kuerzel] = amountForDepot;
+    distributedAmount += amountForDepot;
+  }
+
+  return {
+    allocationsByDepot,
+    distributedAmount,
+    openRemainder: remainder - distributedAmount,
+    rounds
   };
 }
 

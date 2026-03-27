@@ -142,7 +142,7 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ color: 'var(--color-primary)', marginBottom: '0.4rem' }}>⚙️ Stammdaten</h2>
         <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
-          Artikel und Depots verwalten — Änderungen gelten sofort für die aktuelle Session.
+          Artikel und Depots verwalten. Änderungen werden sofort übernommen und gespeichert.
         </p>
       </div>
 
@@ -192,7 +192,7 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
               </select>
             </div>
             <button className="button" style={{ marginBottom: '0' }} onClick={handleAddArticle}>
-              + Hinzufügen
+              ＋ Artikel anlegen
             </button>
           </div>
 
@@ -237,7 +237,7 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
                         <td><span className="badge">{art.unit}</span></td>
                         <td style={{ display: 'flex', gap: '0.4rem', padding: '8px' }}>
                           <button style={btnStyle('var(--color-primary)')} onClick={() => handleStartEditArticle(idx)}>✏️ Bearbeiten</button>
-                          <button style={btnStyle('var(--color-danger)')} onClick={() => handleDeleteArticle(idx)}>🗑️</button>
+                          <button style={btnStyle('var(--color-danger)')} onClick={() => handleDeleteArticle(idx)}>✕ Löschen</button>
                         </td>
                       </>
                     )}
@@ -261,20 +261,23 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
               <div key={f.label}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.3rem' }}>{f.label}</label>
                 <input style={{ ...inputStyle, width: f.w }} placeholder={f.placeholder} value={f.val as string}
-                  onChange={e => f.set(e.target.value as any)} />
+                  onChange={e => f.set(e.target.value as any)}
+                  onKeyDown={e => e.key === 'Enter' && handleAddDepot()} />
               </div>
             ))}
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.3rem' }}>Halbe Anteile</label>
               <input type="number" min="0" style={{ ...inputStyle, width: '90px' }} placeholder="0"
-                value={newDepotHalbe} onChange={e => setNewDepotHalbe(Number(e.target.value))} />
+                value={newDepotHalbe} onChange={e => setNewDepotHalbe(Number(e.target.value))}
+                onKeyDown={e => e.key === 'Enter' && handleAddDepot()} />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.3rem' }}>Ganze Anteile</label>
               <input type="number" min="0" style={{ ...inputStyle, width: '90px' }} placeholder="0"
-                value={newDepotGanze} onChange={e => setNewDepotGanze(Number(e.target.value))} />
+                value={newDepotGanze} onChange={e => setNewDepotGanze(Number(e.target.value))}
+                onKeyDown={e => e.key === 'Enter' && handleAddDepot()} />
             </div>
-            <button className="button" onClick={handleAddDepot}>+ Hinzufügen</button>
+            <button className="button" onClick={handleAddDepot}>＋ Depot anlegen</button>
           </div>
 
           {/* Depot table */}
@@ -298,19 +301,23 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
                       <>
                         <td>
                           <input style={{ ...inputStyle, width: '130px' }} value={editDepot.name ?? ''} autoFocus
-                            onChange={e => setEditDepot(p => ({ ...p, name: e.target.value }))} />
+                            onChange={e => setEditDepot(p => ({ ...p, name: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveDepot(idx)} />
                         </td>
                         <td>
                           <input style={{ ...inputStyle, width: '80px' }} value={editDepot.kuerzel ?? ''}
-                            onChange={e => setEditDepot(p => ({ ...p, kuerzel: e.target.value }))} />
+                            onChange={e => setEditDepot(p => ({ ...p, kuerzel: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveDepot(idx)} />
                         </td>
                         <td>
                           <input type="number" min="0" style={{ ...inputStyle, width: '70px' }} value={editDepot.halbeAnteile ?? 0}
-                            onChange={e => setEditDepot(p => ({ ...p, halbeAnteile: Number(e.target.value) }))} />
+                            onChange={e => setEditDepot(p => ({ ...p, halbeAnteile: Number(e.target.value) }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveDepot(idx)} />
                         </td>
                         <td>
                           <input type="number" min="0" style={{ ...inputStyle, width: '70px' }} value={editDepot.ganzeAnteile ?? 0}
-                            onChange={e => setEditDepot(p => ({ ...p, ganzeAnteile: Number(e.target.value) }))} />
+                            onChange={e => setEditDepot(p => ({ ...p, ganzeAnteile: Number(e.target.value) }))}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveDepot(idx)} />
                         </td>
                         <td style={{ color: 'var(--color-text-light)', fontSize: '0.85rem', fontWeight: 600 }}>
                           {calcGesamtHalbe(editDepot.halbeAnteile ?? 0, editDepot.ganzeAnteile ?? 0)}
@@ -331,7 +338,7 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
                         <td><span className="badge">{depot.prozent}%</span></td>
                         <td style={{ display: 'flex', gap: '0.4rem', padding: '8px' }}>
                           <button style={btnStyle('var(--color-primary)')} onClick={() => handleStartEditDepot(idx)}>✏️ Bearbeiten</button>
-                          <button style={btnStyle('var(--color-danger)')} onClick={() => handleDeleteDepot(idx)}>🗑️</button>
+                          <button style={btnStyle('var(--color-danger)')} onClick={() => handleDeleteDepot(idx)}>✕ Löschen</button>
                         </td>
                       </>
                     )}
@@ -342,7 +349,7 @@ export default function MasterDataView({ articles, depots, onArticlesChange, onD
           </div>
 
           <p style={{ marginTop: '1rem', fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-            💡 Gesamt halbe Anteile: <strong>{depots.reduce((s, d) => s + d.gesamtHalbeAnteile, 0)}</strong>
+            ℹ️ Gesamt halbe Anteile: <strong>{depots.reduce((s, d) => s + d.gesamtHalbeAnteile, 0)}</strong>
           </p>
         </div>
       )}

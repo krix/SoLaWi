@@ -29,20 +29,9 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const saveHistory = async (year: string, updatedHistory: any[]) => {
-    const headers = ["Datum", "Depot", "Artikel", "GesamtMenge", "Ganze Anteile", "Halbe Anteile", "Einheit"];
-    let mdContent = headers.join('\t') + '\n';
-    
-    for (const row of updatedHistory) {
-      let ges = typeof row.gesamtMenge === 'number' && Number.isInteger(row.gesamtMenge) ? row.gesamtMenge.toString() : row.gesamtMenge.toFixed(4).replace(/\.?0+$/, '');
-      let ganzer = typeof row.ganzerAnteil === 'number' && Number.isInteger(row.ganzerAnteil) ? row.ganzerAnteil.toString() : row.ganzerAnteil.toFixed(4).replace(/\.?0+$/, '');
-      let halber = typeof row.halberAnteil === 'number' && Number.isInteger(row.halberAnteil) ? row.halberAnteil.toString() : row.halberAnteil.toFixed(4).replace(/\.?0+$/, '');
-
-      mdContent += `${row.datum}\t${row.depot}\t${row.artikel}\t${ges}\t${ganzer}\t${halber}\t${row.einheit}\n`;
-    }
-
     const jsonContent = JSON.stringify(updatedHistory, null, 2);
     try {
-      await invoke('sync_history', { year, mdContent, jsonContent });
+      await invoke('sync_history', { year, jsonContent });
     } catch (e) {
       console.error("Failed to save history:", e);
       alert("Fehler beim Speichern der Historie.");
