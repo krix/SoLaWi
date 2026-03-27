@@ -65,22 +65,61 @@ function App() {
     }
   }, [selectedYear]);
 
-  // Editable master data — loaded from localStorage, falls back to data.ts defaults
-  const [editableArticles, setEditableArticlesRaw] = useState<Article[]>(
-    () => loadFromStorage<Article[]>(LS_ARTICLES, UNIQUE_ARTICLES)
-  );
-  const [editableDepots, setEditableDepotsRaw] = useState<Depot[]>(
-    () => loadFromStorage<Depot[]>(LS_DEPOTS, DEPOTS)
-  );
+  const [editableArticles, setEditableArticlesRaw] = useState<Article[]>(UNIQUE_ARTICLES);
+  const [editableDepots, setEditableDepotsRaw] = useState<Depot[]>(DEPOTS);
 
-  // Wrappers that also persist to localStorage
+  // Initial load from backend (or secondary localStorage)
+  useEffect(() => {
+    const initMasterData = async () => {
+      try {
+        const raw = await invoke<string>('load_master_data');
+        const parsed = JSON.parse(raw);
+        
+        let initialArticles = UNIQUE_ARTICLES;
+        let initialDepots = DEPOTS;
+
+        // Try Backend File first
+        if (parsed.articles && Array.isArray(parsed.articles) && parsed.articles.length > 0) {
+          initialArticles = parsed.articles;
+        } else {
+          // Fallback to LocalStorage
+          initialArticles = loadFromStorage<Article[]>(LS_ARTICLES, UNIQUE_ARTICLES);
+        }
+
+        if (parsed.depots && Array.isArray(parsed.depots) && parsed.depots.length > 0) {
+          initialDepots = parsed.depots;
+        } else {
+          // Fallback to LocalStorage
+          initialDepots = loadFromStorage<Depot[]>(LS_DEPOTS, DEPOTS);
+        }
+
+        setEditableArticlesRaw(initialArticles);
+        setEditableDepotsRaw(initialDepots);
+      } catch (e) {
+        console.error("Failed to load master data from backend:", e);
+      }
+    };
+    initMasterData();
+  }, []);
+
   const setEditableArticles = (articles: Article[]) => {
     localStorage.setItem(LS_ARTICLES, JSON.stringify(articles));
     setEditableArticlesRaw(articles);
+    // Explicit sync to backend
+    invoke('save_master_data', { 
+      articlesJson: JSON.stringify(articles), 
+      depotsJson: JSON.stringify(editableDepots) 
+    }).catch(console.error);
   };
+
   const setEditableDepots = (depots: Depot[]) => {
     localStorage.setItem(LS_DEPOTS, JSON.stringify(depots));
     setEditableDepotsRaw(depots);
+    // Explicit sync to backend
+    invoke('save_master_data', { 
+      articlesJson: JSON.stringify(editableArticles), 
+      depotsJson: JSON.stringify(depots) 
+    }).catch(console.error);
   };
 
   const selectedArticleDefault = editableArticles[0]?.name ?? '';
