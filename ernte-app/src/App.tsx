@@ -29,7 +29,8 @@ function App() {
     const initYears = async () => {
       try {
         const years = await invoke<string[]>('list_history_years');
-        setAvailableYears(years);
+        const augmented = ["Alle", ...years];
+        setAvailableYears(augmented);
         if (years.length > 0) {
           const today = new Date();
           const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
@@ -37,7 +38,7 @@ function App() {
           if (years.includes(currentHarvestYear)) {
             setSelectedYear(currentHarvestYear);
           } else {
-            setSelectedYear(years[0]);
+            setSelectedYear(augmented[0]);
           }
         }
       } catch (e) {
@@ -52,7 +53,9 @@ function App() {
     if (selectedYear) {
       const loadData = async () => {
         try {
-          const raw = await invoke<string>('load_history', { year: selectedYear });
+          const command = selectedYear === "Alle" ? 'load_all_history' : 'load_history';
+          const args = selectedYear === "Alle" ? {} : { year: selectedYear };
+          const raw = await invoke<string>(command, args);
           setHistoryData(JSON.parse(raw));
         } catch (e) {
           console.error("Failed to load history for year:", selectedYear, e);
@@ -213,21 +216,22 @@ function App() {
        }
     }
 
-    setHistoryData(updatedHistory);
+    const year = getHarvestYear(todayStr);
+    
+    // Safety: only sync rows belonging to the current target harvest year
+    const jsonForSync = updatedHistory.filter(row => getHarvestYear(row.datum) === year);
+    const jsonContent = JSON.stringify(jsonForSync, null, 2);
 
+    // Regenerate MD content for just that year
     const headers = ["Datum", "Depot", "Artikel", "GesamtMenge", "Ganze Anteile", "Halbe Anteile", "Einheit"];
     let mdContent = headers.join('\t') + '\n';
-    
-    for (const row of updatedHistory) {
+    for (const row of jsonForSync) {
       let ges = typeof row.gesamtMenge === 'number' && Number.isInteger(row.gesamtMenge) ? row.gesamtMenge.toString() : row.gesamtMenge.toFixed(4).replace(/\.?0+$/, '');
       let ganzer = typeof row.ganzerAnteil === 'number' && Number.isInteger(row.ganzerAnteil) ? row.ganzerAnteil.toString() : row.ganzerAnteil.toFixed(4).replace(/\.?0+$/, '');
       let halber = typeof row.halberAnteil === 'number' && Number.isInteger(row.halberAnteil) ? row.halberAnteil.toString() : row.halberAnteil.toFixed(4).replace(/\.?0+$/, '');
 
       mdContent += `${row.datum}\t${row.depot}\t${row.artikel}\t${ges}\t${ganzer}\t${halber}\t${row.einheit}\n`;
     }
-
-    const jsonContent = JSON.stringify(updatedHistory, null, 2);
-    const year = getHarvestYear(todayStr);
 
     try {
         await invoke('sync_history', { year, mdContent, jsonContent });

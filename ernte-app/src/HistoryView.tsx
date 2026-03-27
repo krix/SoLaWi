@@ -236,7 +236,9 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <h2 style={{ color: 'var(--color-primary)', margin: 0 }}>Erweiterte Verteilungsstatistiken ({selectedYear})</h2>
+            <h2 style={{ color: 'var(--color-primary)', margin: 0 }}>
+              Erweiterte Verteilungsstatistiken {selectedYear === 'Alle' ? '(Alle Jahre)' : `(${selectedYear})`}
+            </h2>
           </div>
           <p style={{ color: 'var(--color-text-light)', fontSize: '0.9rem' }}>
             Auswertung von <strong>{baseFilteredData.length}</strong> historischen Daten.
@@ -245,7 +247,18 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
             <button className="button outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={handleExportCSV}>
               📥 CSV Export
             </button>
-            <button className="button outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => fileInputRef.current?.click()}>
+            <button 
+              className="button outline" 
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', opacity: selectedYear === 'Alle' ? 0.5 : 1 }} 
+              onClick={() => {
+                if (selectedYear === 'Alle') {
+                  alert("Bitte wähle ein spezifisches Erntejahr aus, um Daten zu importieren.");
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              title={selectedYear === 'Alle' ? "Import nur in spezifischen Jahren möglich" : ""}
+            >
               📤 CSV Import
             </button>
             <input 

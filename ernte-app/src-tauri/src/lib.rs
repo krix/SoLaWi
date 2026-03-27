@@ -68,13 +68,32 @@ fn list_history_years() -> Result<Vec<String>, String> {
     Ok(years)
 }
 
+#[tauri::command]
+fn load_all_history() -> Result<String, String> {
+    let years = list_history_years()?;
+    let mut all_data = Vec::new();
+    
+    for year in years {
+        let json_path = format!("../../historie-{}.json", year);
+        if let Ok(content) = fs::read_to_string(json_path) {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(arr) = parsed.as_array() {
+                    all_data.extend(arr.clone());
+                }
+            }
+        }
+    }
+    
+    serde_json::to_string(&all_data).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, sync_history, load_history, list_history_years, save_csv_file])
+        .invoke_handler(tauri::generate_handler![greet, sync_history, load_history, list_history_years, save_csv_file, load_all_history])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
