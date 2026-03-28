@@ -5,7 +5,12 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
+// Pull in the auto-generated function `embedded_historie_files()` that
+// returns Vec<(&str, &str)> with (filename, json_content) pairs.
+include!(concat!(env!("OUT_DIR"), "/embedded_historie.rs"));
+
 /// Checks whether a directory contains any history or master-data files.
+#[allow(dead_code)]
 fn contains_data_files(dir: &Path) -> bool {
     fs::read_dir(dir)
         .map(|entries| {
@@ -111,8 +116,8 @@ fn get_data_dir(app: &tauri::AppHandle) -> PathBuf {
 }
 
 /// Called once during app setup.  For **release** builds it ensures the
-/// writable app-data directory exists and seeds it with the bundled
-/// resource files (historie-*.json) that ship inside the installer.
+/// writable app-data directory exists and seeds it with the historie data
+/// that is compiled into the binary (no external resource files needed).
 fn init_data_dir(app: &tauri::AppHandle) {
     let data_dir = get_data_dir(app);
     eprintln!("[data-init] data_dir = {}", data_dir.display());
@@ -124,14 +129,19 @@ fn init_data_dir(app: &tauri::AppHandle) {
             let _ = fs::create_dir_all(&data_dir);
         }
 
-        // 1. Copy from Tauri's bundled resource directory (read-only)
-        if let Ok(resource_dir) = app.path().resource_dir() {
-            eprintln!("[data-init] resource_dir = {}", resource_dir.display());
-            copy_data_files(&resource_dir, &data_dir);
+        // 1. Seed from data embedded in the binary (historie-*.json).
+        //    Only writes files that do not already exist (first launch).
+        for (filename, content) in embedded_historie_files() {
+            let dst = data_dir.join(filename);
+            if !dst.exists() {
+                let _ = fs::write(&dst, content);
+                eprintln!("[data-init] Seeded {}", dst.display());
+            }
         }
 
-        // 2. Legacy migration: files may sit next to the executable from
-        //    an older version of the app.
+        // 2. Legacy migration: users upgrading from v1.0.0 may still
+        //    have data files next to the executable.  Copy any that are
+        //    missing in app_data_dir (won't overwrite newer files).
         if let Some(exe_dir) = std::env::current_exe()
             .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()))
