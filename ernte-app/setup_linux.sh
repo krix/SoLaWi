@@ -7,7 +7,7 @@ set -e
 
 echo ""
 echo "========================================="
-echo "  SoLaWi Ernte-App – Linux Build v1.0.0"
+echo "  SoLaWi Ernte-App – Linux Build v1.0.1"
 echo "========================================="
 echo ""
 

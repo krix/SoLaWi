@@ -30,7 +30,11 @@ function App() {
       try {
         const years = await invoke<string[]>('list_history_years');
         setAvailableYears(["Alle", ...years]);
-        setSelectedYear("Alle");
+        // Default to current harvest year
+        const currentHarvestYear = getHarvestYear(
+          `01.${String(new Date().getMonth() + 1).padStart(2, '0')}.${new Date().getFullYear()}`
+        );
+        setSelectedYear(years.includes(currentHarvestYear) ? currentHarvestYear : "Alle");
       } catch (e) {
         console.error("Failed to list history years:", e);
       }

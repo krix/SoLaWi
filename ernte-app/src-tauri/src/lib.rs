@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[allow(unused_imports)]
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 /// Checks whether a directory contains any history or master-data files.
@@ -16,21 +18,37 @@ fn contains_data_files(dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Resolves the data directory by searching upwards from the executable
-/// (handles dev-mode where the exe is inside target/debug/) and also
-/// checks the current working directory and Linux resource paths.
-/// Prefers the highest-level (outermost) directory that contains data
-/// files so that in dev-mode the workspace root is chosen over
-/// target/debug/ which may only hold a partial copy.
-/// Falls back to the exe directory for fresh installs.
-fn get_base_path() -> PathBuf {
+/// Copy historie-*.json and stammdaten.json from src to dst.
+/// Only copies files that do NOT already exist in dst (no overwrite).
+#[allow(dead_code)]
+fn copy_data_files(src: &Path, dst: &Path) {
+    if let Ok(entries) = fs::read_dir(src) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name().into_string().unwrap_or_default();
+            let is_data_file = (name.starts_with("historie-") && name.ends_with(".json"))
+                || name == "stammdaten.json";
+            if is_data_file {
+                let dst_file = dst.join(&name);
+                if !dst_file.exists() {
+                    let _ = fs::copy(entry.path(), &dst_file);
+                    eprintln!("[data-init] Copied {} → {}", entry.path().display(), dst_file.display());
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dev-mode helper: walk upward from exe to find the workspace root that
+// contains the data files (existing behaviour for `cargo tauri dev`).
+// ---------------------------------------------------------------------------
+#[cfg(debug_assertions)]
+fn get_dev_base_path() -> PathBuf {
     let exe_dir = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| PathBuf::from("."));
 
-    // Walk upwards from exe directory and remember every directory that
-    // contains data files.  The last (= highest / outermost) match wins.
     let mut best_match: Option<PathBuf> = None;
     let mut candidate = exe_dir.clone();
     for _ in 0..6 {
@@ -47,7 +65,6 @@ fn get_base_path() -> PathBuf {
         return path;
     }
 
-    // Also check current working directory and its parent
     if let Ok(cwd) = std::env::current_dir() {
         if contains_data_files(&cwd) {
             return cwd;
@@ -59,20 +76,77 @@ fn get_base_path() -> PathBuf {
         }
     }
 
-    // Linux .deb: resources are at /usr/lib/<identifier>/
-    #[cfg(target_os = "linux")]
-    {
-        let linux_resource_dir = PathBuf::from("/usr/lib/com.solawi.ernte");
-        if contains_data_files(&linux_resource_dir) {
-            return linux_resource_dir;
-        }
-    }
-
-    // Fallback: exe directory (fresh install, no existing data)
     exe_dir
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// ---------------------------------------------------------------------------
+// Data-directory resolution
+// ---------------------------------------------------------------------------
+
+/// Returns the **writable** directory used for all data files.
+///
+/// * **Debug / dev builds** – walks upward from the executable to find the
+///   workspace root (so `cargo tauri dev` keeps working as before).
+/// * **Release builds** – returns the OS-specific app-data directory
+///   (`~/.local/share/com.solawi.ernte` on Linux,
+///    `%APPDATA%\com.solawi.ernte` on Windows).
+fn get_data_dir(app: &tauri::AppHandle) -> PathBuf {
+    #[cfg(debug_assertions)]
+    {
+        let _ = app;
+        get_dev_base_path()
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        app.path()
+            .app_data_dir()
+            .unwrap_or_else(|_| {
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                    .unwrap_or_else(|| PathBuf::from("."))
+            })
+    }
+}
+
+/// Called once during app setup.  For **release** builds it ensures the
+/// writable app-data directory exists and seeds it with the bundled
+/// resource files (historie-*.json) that ship inside the installer.
+fn init_data_dir(app: &tauri::AppHandle) {
+    let data_dir = get_data_dir(app);
+    eprintln!("[data-init] data_dir = {}", data_dir.display());
+
+    #[cfg(not(debug_assertions))]
+    {
+        // Create directory if necessary
+        if !data_dir.exists() {
+            let _ = fs::create_dir_all(&data_dir);
+        }
+
+        // 1. Copy from Tauri's bundled resource directory (read-only)
+        if let Ok(resource_dir) = app.path().resource_dir() {
+            eprintln!("[data-init] resource_dir = {}", resource_dir.display());
+            copy_data_files(&resource_dir, &data_dir);
+        }
+
+        // 2. Legacy migration: files may sit next to the executable from
+        //    an older version of the app.
+        if let Some(exe_dir) = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        {
+            if exe_dir != data_dir {
+                copy_data_files(&exe_dir, &data_dir);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands
+// ---------------------------------------------------------------------------
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -86,7 +160,7 @@ async fn save_csv_file(handle: tauri::AppHandle, content: String, default_name: 
         .add_filter("CSV", &["csv"])
         .set_title("CSV Export Speichern")
         .blocking_save_file();
-    
+
     if let Some(p) = path {
         let p_buf: std::path::PathBuf = p.into_path().map_err(|e| e.to_string())?;
         fs::write(p_buf, content).map_err(|e: std::io::Error| e.to_string())?;
@@ -95,29 +169,28 @@ async fn save_csv_file(handle: tauri::AppHandle, content: String, default_name: 
 }
 
 #[tauri::command]
-fn sync_history(year: &str, json_content: &str) -> Result<(), String> {
-    let base = get_base_path();
+fn sync_history(app: tauri::AppHandle, year: &str, json_content: &str) -> Result<(), String> {
+    let base = get_data_dir(&app);
     let json_path = base.join(format!("historie-{}.json", year));
-    
-    fs::write(json_path, json_content).map_err(|e| e.to_string())?;
-    
+    fs::write(&json_path, json_content).map_err(|e| e.to_string())?;
+    eprintln!("[sync_history] wrote {}", json_path.display());
     Ok(())
 }
 
 #[tauri::command]
-fn load_history(year: &str) -> Result<String, String> {
-    let json_path = get_base_path().join(format!("historie-{}.json", year));
+fn load_history(app: tauri::AppHandle, year: &str) -> Result<String, String> {
+    let json_path = get_data_dir(&app).join(format!("historie-{}.json", year));
     if !json_path.exists() {
         return Ok("[]".to_string());
     }
-    fs::read_to_string(json_path).map_err(|e| e.to_string())
+    fs::read_to_string(&json_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn list_history_years() -> Result<Vec<String>, String> {
+fn list_history_years(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let mut years = Vec::new();
-    let root = get_base_path();
-    let paths = fs::read_dir(root).map_err(|e| e.to_string())?;
+    let root = get_data_dir(&app);
+    let paths = fs::read_dir(&root).map_err(|e| e.to_string())?;
 
     for path in paths {
         if let Ok(entry) = path {
@@ -136,11 +209,11 @@ fn list_history_years() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn load_all_history() -> Result<String, String> {
-    let years = list_history_years()?;
+fn load_all_history(app: tauri::AppHandle) -> Result<String, String> {
+    let years = list_history_years(app.clone())?;
     let mut all_data = Vec::new();
-    let base = get_base_path();
-    
+    let base = get_data_dir(&app);
+
     for year in years {
         let json_path = base.join(format!("historie-{}.json", year));
         if let Ok(content) = fs::read_to_string(json_path) {
@@ -151,31 +224,38 @@ fn load_all_history() -> Result<String, String> {
             }
         }
     }
-    
+
     serde_json::to_string(&all_data).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn save_master_data(articles_json: &str, depots_json: &str) -> Result<(), String> {
-    let base = get_base_path();
+fn save_master_data(app: tauri::AppHandle, articles_json: &str, depots_json: &str) -> Result<(), String> {
+    let base = get_data_dir(&app);
     let json_path = base.join("stammdaten.json");
-    
+
     let combined = serde_json::json!({
         "articles": serde_json::from_str::<serde_json::Value>(articles_json).unwrap_or_default(),
         "depots": serde_json::from_str::<serde_json::Value>(depots_json).unwrap_or_default()
     });
-    
-    fs::write(json_path, combined.to_string()).map_err(|e| e.to_string())?;
+
+    fs::write(&json_path, combined.to_string()).map_err(|e| e.to_string())?;
+    eprintln!("[save_master_data] wrote {}", json_path.display());
     Ok(())
 }
 
 #[tauri::command]
-fn load_master_data() -> Result<String, String> {
-    let json_path = get_base_path().join("stammdaten.json");
+fn load_master_data(app: tauri::AppHandle) -> Result<String, String> {
+    let json_path = get_data_dir(&app).join("stammdaten.json");
     if !json_path.exists() {
         return Ok("{}".to_string());
     }
-    fs::read_to_string(json_path).map_err(|e| e.to_string())
+    fs::read_to_string(&json_path).map_err(|e| e.to_string())
+}
+
+/// Diagnostic command – returns the resolved data directory path.
+#[tauri::command]
+fn get_data_path(app: tauri::AppHandle) -> String {
+    get_data_dir(&app).to_string_lossy().to_string()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -184,7 +264,21 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![greet, sync_history, load_history, list_history_years, save_csv_file, load_all_history, save_master_data, load_master_data])
+        .setup(|app| {
+            init_data_dir(app.handle());
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            sync_history,
+            load_history,
+            list_history_years,
+            save_csv_file,
+            load_all_history,
+            save_master_data,
+            load_master_data,
+            get_data_path
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
