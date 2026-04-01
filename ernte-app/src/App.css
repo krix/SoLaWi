@@ -247,8 +247,28 @@ tr:hover td {
   .app-layout {
     padding: 0;
   }
-  .print-page {
-    page-break-after: always;
+  .print-layout {
+    padding: 0;
+  }
+  .print-title-block {
+    margin-bottom: 0.8cm;
+    break-inside: avoid;
+  }
+  .print-summary-block {
+    margin-bottom: 0.8cm;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-overview-table th,
+  .print-overview-table td {
+    white-space: nowrap;
+    font-size: 10pt;
+    padding: 6px !important;
+  }
+  .print-depot-block {
+    margin-bottom: 0.75cm;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   @page {
     margin: 1cm;

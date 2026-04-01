@@ -6,6 +6,22 @@ import { calculateDistribution, calculatePieceRemainderAllocation, Distribution,
 import HistoryView from './HistoryView';
 import MasterDataView from './MasterDataView';
 
+type PrintRow = {
+  id: string;
+  articleName: string;
+  unit: string;
+  totalAmount: number;
+  perHalb: number;
+  perGanz: number;
+};
+
+type PrintOverviewRow = {
+  id: string;
+  articleName: string;
+  unit: string;
+  amountsByDepot: Record<string, number>;
+};
+
 const LS_ARTICLES = 'solawi_articles';
 const LS_DEPOTS   = 'solawi_depots';
 
@@ -238,6 +254,78 @@ function App() {
 
   const [printMode, setPrintMode] = useState(false);
 
+  const formatPrintAmount = (value: number, unit: string) => {
+    return unit === 'Stück' ? Math.round(value).toString() : value.toFixed(2);
+  };
+
+  const formatPrintUnit = (unit: string) => {
+    return unit === 'Stück' ? 'St.' : unit;
+  };
+
+  const printData = useMemo(() => {
+    const byDepot: Record<string, PrintRow[]> = {};
+    const overviewRows: PrintOverviewRow[] = [];
+
+    for (const depot of editableDepots) {
+      byDepot[depot.kuerzel] = [];
+    }
+
+    for (const dist of distributions) {
+      const allocation = getRemainderAllocation(dist);
+      const amountsByDepot: Record<string, number> = {};
+      let hasAnyAmount = false;
+
+      for (const depot of editableDepots) {
+        const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
+        const isExcluded = !!res?.isExcluded;
+        const baseAmount = !isExcluded ? (res?.calculatedAmount || 0) : 0;
+        const allocatedRemainder = allocation.allocationsByDepot[depot.kuerzel] || 0;
+        const totalDepotAmount = baseAmount + allocatedRemainder;
+
+        if (isExcluded || totalDepotAmount <= 0) continue;
+
+        const perHalb = totalDepotAmount / depot.gesamtHalbeAnteile;
+        byDepot[depot.kuerzel].push({
+          id: dist.id,
+          articleName: dist.articleName,
+          unit: dist.unit,
+          totalAmount: totalDepotAmount,
+          perHalb,
+          perGanz: perHalb * 2
+        });
+
+        amountsByDepot[depot.kuerzel] = totalDepotAmount;
+        hasAnyAmount = true;
+      }
+
+      if (hasAnyAmount) {
+        overviewRows.push({
+          id: dist.id,
+          articleName: dist.articleName,
+          unit: dist.unit,
+          amountsByDepot
+        });
+      }
+    }
+
+    const sortRows = (rows: PrintRow[]) => {
+      rows.sort((a, b) => {
+        if (a.unit !== b.unit) return a.unit === 'Stück' ? -1 : 1;
+        return a.articleName.localeCompare(b.articleName);
+      });
+    };
+
+    for (const depot of editableDepots) {
+      sortRows(byDepot[depot.kuerzel]);
+    }
+    overviewRows.sort((a, b) => {
+      if (a.unit !== b.unit) return a.unit === 'Stück' ? -1 : 1;
+      return a.articleName.localeCompare(b.articleName);
+    });
+
+    return { byDepot, overviewRows };
+  }, [distributions, editableDepots]);
+
   const handlePrint = async () => {
     if (activeTab !== 'calculator' || distributions.length === 0) return;
     
@@ -304,64 +392,78 @@ function App() {
   if (printMode) {
     return (
       <div className="print-layout">
+        <section className="print-summary-block">
+          <h2>Gesamtverteilung über alle Depots</h2>
+          <table className="print-overview-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
+            <thead>
+              <tr>
+                <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
+                {editableDepots.map(depot => (
+                  <th key={`overview-header-${depot.kuerzel}`} style={{ borderBottom: '2px solid black', padding: '8px' }}>
+                    {depot.kuerzel}
+                  </th>
+                ))}
+                <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Summe</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printData.overviewRows.map(row => (
+                <tr key={`overall-${row.id}`}>
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
+                  {editableDepots.map(depot => {
+                    const amount = row.amountsByDepot[depot.kuerzel] || 0;
+                    return (
+                      <td key={`overview-cell-${row.id}-${depot.kuerzel}`} style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                        {amount > 0 ? `${formatPrintAmount(amount, row.unit)} ${formatPrintUnit(row.unit)}` : '-'}
+                      </td>
+                    );
+                  })}
+                  <td style={{ borderBottom: '1px solid #ddd', padding: '8px', fontWeight: 600 }}>
+                    {`${formatPrintAmount(
+                      editableDepots.reduce((sum, depot) => sum + (row.amountsByDepot[depot.kuerzel] || 0), 0),
+                      row.unit
+                    )} ${formatPrintUnit(row.unit)}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {printData.overviewRows.length === 0 && <p>Keine Ernte eingetragen.</p>}
+        </section>
+
         {editableDepots.map(depot => {
-          const validDistributions = distributions.filter(d => {
-             const res = d.results.find(r => r.depotKuerzel === depot.kuerzel);
-             const allocation = getRemainderAllocation(d);
-             const allocatedRemainder = allocation.allocationsByDepot[depot.kuerzel] || 0;
-             return (res && !res.isExcluded && res.calculatedAmount > 0) || allocatedRemainder > 0;
-          })
-          // Stück-Artikel zuerst, dann kg-Artikel
-          .sort((a, b) => {
-            if (a.unit === b.unit) return 0;
-            return a.unit === 'Stück' ? -1 : 1;
-          });
+          const rows = printData.byDepot[depot.kuerzel] || [];
 
           return (
-            <div key={depot.kuerzel} className="print-page">
-              <h1>Ernteverteilung - {depot.name}</h1>
+            <section key={depot.kuerzel} className="print-depot-block">
+              <h2>Depot: {depot.name}</h2>
               <p style={{ marginBottom: '1rem', color: '#666' }}>
                 Gesamt: {depot.gesamtHalbeAnteile} Halbe Anteile ({depot.halbeAnteile} Halbe, {depot.ganzeAnteile} Ganze)
               </p>
-              
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '2rem' }}>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
                 <thead>
                   <tr>
                     <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
-                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Gesamtmenge für Depot</th>
+                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Gesamtmenge fuer Depot</th>
                     <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen halben Anteil</th>
                     <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen ganzen Anteil</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {validDistributions.map(dist => {
-                    const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
-                    const allocation = getRemainderAllocation(dist);
-                    const allocatedRemainder = allocation.allocationsByDepot[depot.kuerzel] || 0;
-                    
-                    const unit = dist.unit;
-                    const totalDepotAmount = (res && !res.isExcluded ? res.calculatedAmount : 0) + allocatedRemainder;
-                    
-                    const perHalbNum = totalDepotAmount / depot.gesamtHalbeAnteile;
-                    const perGanzNum = perHalbNum * 2;
-
-                    const fmt = (v: number) => unit === 'Stück' ? Math.round(v).toString() : v.toFixed(2);
-                    const fmtAmount = unit === 'Stück' ? Math.round(totalDepotAmount).toString() : totalDepotAmount.toFixed(2);
-
-                    return (
-                      <tr key={dist.id}>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{dist.articleName}</strong></td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmtAmount} {unit}</td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmt(perHalbNum)} {unit}</td>
-                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{fmt(perGanzNum)} {unit}</td>
-                      </tr>
-                    );
-                  })}
+                  {rows.map(row => (
+                    <tr key={`${depot.kuerzel}-${row.id}`}>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.totalAmount, row.unit)} {formatPrintUnit(row.unit)}</td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.perHalb, row.unit)} {formatPrintUnit(row.unit)}</td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.perGanz, row.unit)} {formatPrintUnit(row.unit)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
 
-              {validDistributions.length === 0 && <p>Keine Ernte für dieses Depot erfasst.</p>}
-            </div>
+              {rows.length === 0 && <p>Keine Ernte fuer dieses Depot erfasst.</p>}
+            </section>
           );
         })}
       </div>
