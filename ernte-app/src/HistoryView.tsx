@@ -344,11 +344,12 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="datum" stroke="#888" fontSize={12} />
                 <YAxis stroke="#888" fontSize={12} domain={['auto', 'auto']} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 100 }}
+                  wrapperStyle={{ zIndex: 100 }}
                   formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : value}
                 />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
                 {allDepots.map((d, i) => (
                   <Line 
                     key={d.kuerzel} 

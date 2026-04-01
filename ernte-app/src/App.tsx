@@ -33,6 +33,10 @@ function loadFromStorage<T>(key: string, fallback: T): T {
   return fallback;
 }
 
+function getArticleSelectionKey(article: Pick<Article, 'name' | 'unit'>): string {
+  return `${article.name}__${article.unit}`;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<'calculator' | 'history' | 'masterdata'>('calculator');
   const [distributions, setDistributions] = useState<Distribution[]>([]);
@@ -132,10 +136,22 @@ function App() {
     }).catch(console.error);
   };
 
-  const selectedArticleDefault = editableArticles[0]?.name ?? '';
+  const selectedArticleDefault = editableArticles[0] ? getArticleSelectionKey(editableArticles[0]) : '';
   const [selectedArticle, setSelectedArticle] = useState<string>(selectedArticleDefault);
   const [amount, setAmount] = useState<number | ''>('');
-  
+
+  useEffect(() => {
+    if (editableArticles.length === 0) {
+      if (selectedArticle !== '') setSelectedArticle('');
+      return;
+    }
+
+    const hasSelectedArticle = editableArticles.some(article => getArticleSelectionKey(article) === selectedArticle);
+    if (!hasSelectedArticle) {
+      setSelectedArticle(getArticleSelectionKey(editableArticles[0]));
+    }
+  }, [editableArticles, selectedArticle]);
+
   const fairnessByArticle = useMemo(() => {
     const map: Record<string, Record<string, 'viel' | 'wenig' | 'normal'>> = {};
     for (const d of distributions) {
@@ -160,11 +176,11 @@ function App() {
   
   const handleAddHarvest = () => {
     if (typeof amount !== 'number' || amount <= 0) return;
-    const article = editableArticles.find(a => a.name === selectedArticle) as Article;
+    const article = editableArticles.find(a => getArticleSelectionKey(a) === selectedArticle) as Article;
     if (!article) return;
     
     // Check if already exists
-    if (distributions.find(d => d.articleName === article.name)) {
+    if (distributions.find(d => d.articleName === article.name && d.unit === article.unit)) {
       alert("Artikel wurde bereits zur Ernte hinzugefügt!");
       return;
     }
@@ -387,6 +403,8 @@ function App() {
   };
 
   if (printMode) {
+    const printDate = new Date().toLocaleDateString('de-DE');
+
     return (
       <div className="print-preview-overlay" style={{
         position: 'fixed',
@@ -410,6 +428,7 @@ function App() {
           <div className="print-layout">
             <section className="print-summary-block">
           <h2>Gesamtverteilung über alle Depots</h2>
+          <p style={{ marginBottom: '1rem', color: '#666' }}>Datum: {printDate}</p>
           <table className="print-overview-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
             <thead>
               <tr>
@@ -453,8 +472,9 @@ function App() {
           return (
             <section key={depot.kuerzel} className="print-depot-block">
               <h2>Depot: {depot.name}</h2>
-              <p style={{ marginBottom: '1rem', color: '#666' }}>
-                Gesamt: {depot.gesamtHalbeAnteile} Halbe Anteile ({depot.halbeAnteile} Halbe, {depot.ganzeAnteile} Ganze)
+              <p style={{ marginBottom: '1rem', color: '#666', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                <span>Gesamt: {depot.gesamtHalbeAnteile} Halbe Anteile ({depot.halbeAnteile} Halbe, {depot.ganzeAnteile} Ganze)</span>
+                <span style={{ marginLeft: 'auto', textAlign: 'right' }}>Datum: {printDate}</span>
               </p>
 
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
@@ -568,7 +588,7 @@ function App() {
                   onChange={e => setSelectedArticle(e.target.value)}
                 >
                   {[...editableArticles].sort((a, b) => a.name.localeCompare(b.name, 'de-DE')).map(a => (
-                    <option key={`${a.name}-${a.unit}`} value={a.name}>{a.name} ({a.unit})</option>
+                    <option key={`${a.name}-${a.unit}`} value={getArticleSelectionKey(a)}>{a.name} ({a.unit})</option>
                   ))}
                 </select>
               </div>
@@ -630,7 +650,7 @@ function App() {
                       )}
                     </div>
                     <span style={{ fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
-                      Rechnerisch entspricht ein <strong style={{color: 'var(--color-primary)'}}>halber Anteil ca. {dist.sharePerHalb} {dist.unit}</strong>.
+                      Rechnerisch entspricht ein <strong style={{color: 'var(--color-primary)'}}>halber Anteil ca. {dist.unit === 'kg' ? `${Math.round(dist.sharePerHalb * 1000).toLocaleString('de-DE')} g` : `${dist.sharePerHalb} ${dist.unit}`}</strong>.
                     </span>
                   </div>
 
@@ -675,6 +695,9 @@ function App() {
                                  </span>
                                )}
                              </div>
+                              <div style={{ marginTop: '0.25rem' }}>
+                                Zusatz pro halbem Anteil (aktuelle Auswahl): <strong>+{remainderAllocation.rounds} Stück</strong>
+                              </div>
                              {dist.geschenkeDepotKuerzel.length > 0 && remainderAllocation.rounds === 0 && (
                                <div style={{ marginTop: '0.35rem', color: 'var(--color-danger)' }}>
                                  ⚠️ Keine volle Runde möglich – wähle weniger oder andere Depots.
