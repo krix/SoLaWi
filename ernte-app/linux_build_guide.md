@@ -1,4 +1,4 @@
-# Linux Build Guide - SoLaWi App v1.0.0
+# Linux Build Guide - Auf dem Acker e.V. v1.1.0
 
 Folge diesen Schritten, um die App auf deinem **Linux Mint 22 (Wilma)** oder einem anderen Ubuntu-basierten System zu bauen.
 
@@ -34,9 +34,9 @@ Sobald das Skript fertig ist, findest du deine Installationsdateien hier:
 ```text
 ernte-app/src-tauri/target/release/bundle/
 ├── deb/
-│   └── ernte-app_1.0.0_amd64.deb     <-- Doppelklick zum Installieren
+│   └── ernte-app_1.1.0_amd64.deb     <-- Doppelklick zum Installieren
 └── appimage/
-    └── ernte-app_1.0.0_amd64.AppImage <-- Eigenständige Datei (portabel)
+    └── ernte-app_1.1.0_amd64.AppImage <-- Eigenständige Datei (portabel)
 ```
 
 ## 4. App starten
