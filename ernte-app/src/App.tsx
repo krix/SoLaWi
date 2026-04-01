@@ -391,8 +391,27 @@ function App() {
 
   if (printMode) {
     return (
-      <div className="print-layout">
-        <section className="print-summary-block">
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        overflow: 'auto',
+        padding: '2rem'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          width: '100%',
+          maxWidth: '1200px',
+          padding: '2rem'
+        }}>
+          <div className="print-layout">
+            <section className="print-summary-block">
           <h2>Gesamtverteilung über alle Depots</h2>
           <table className="print-overview-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
             <thead>
@@ -462,10 +481,12 @@ function App() {
                 </tbody>
               </table>
 
-              {rows.length === 0 && <p>Keine Ernte fuer dieses Depot erfasst.</p>}
-            </section>
-          );
-        })}
+                {rows.length === 0 && <p>Keine Ernte für dieses Depot erfasst.</p>}
+             </section>
+           );
+         })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -536,7 +557,7 @@ function App() {
                   value={selectedArticle}
                   onChange={e => setSelectedArticle(e.target.value)}
                 >
-                  {editableArticles.map(a => (
+                  {[...editableArticles].sort((a, b) => a.name.localeCompare(b.name, 'de-DE')).map(a => (
                     <option key={`${a.name}-${a.unit}`} value={a.name}>{a.name} ({a.unit})</option>
                   ))}
                 </select>

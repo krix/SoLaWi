@@ -119,7 +119,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
   const uniqueArticles = useMemo(() => {
     const set = new Set<string>();
     for (const row of baseFilteredData) set.add(row.artikel);
-    return Array.from(set).sort();
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'de-DE'));
   }, [baseFilteredData]);
 
   // Aggregation for the Table (Totals & Fairness)
