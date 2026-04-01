@@ -7,7 +7,7 @@ set -e
 
 echo ""
 echo "========================================="
-echo "  Auf dem Acker e.V. – Linux Build v1.1.0"
+echo "  AckerApp – Linux Build v1.1.0"
 echo "========================================="
 echo ""
 

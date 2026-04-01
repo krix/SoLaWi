@@ -524,8 +524,8 @@ function App() {
             style={{ width: '44px', height: '44px', objectFit: 'contain' }}
           />
           <div>
-            <h1 style={{ color: 'var(--color-primary)' }}>Auf dem Acker e.V.</h1>
-          <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
+            <h1 style={{ color: 'var(--color-primary)' }}>AckerApp</h1>
+           <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
           </div>
         </div>
         

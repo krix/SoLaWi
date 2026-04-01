@@ -1,4 +1,4 @@
-# Linux Build Guide - Auf dem Acker e.V. v1.1.0
+# Linux Build Guide - AckerApp v1.1.0
 
 Folge diesen Schritten, um die App auf deinem **Linux Mint 22 (Wilma)** oder einem anderen Ubuntu-basierten System zu bauen.
 

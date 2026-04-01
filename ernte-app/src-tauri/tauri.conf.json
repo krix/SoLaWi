@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Auf dem Acker e.V.",
+  "productName": "AckerApp",
   "version": "1.1.0",
   "identifier": "com.solawi.ernte",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Auf dem Acker e.V.",
+        "title": "AckerApp",
         "width": 1024,
         "height": 768,
         "maximized": true
