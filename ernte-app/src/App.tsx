@@ -736,7 +736,7 @@ function App() {
                             <th>Netto (kg)</th>
                           </>
                         ) : (
-                          <th>Menge ({dist.unit})</th>
+                           <th>St. pro ½ Anteil</th>
                         )}
                         {dist.unit === 'Stück' && dist.remainder > 0 && <th>Rest zuteilen</th>}
                       </tr>
@@ -784,7 +784,12 @@ function App() {
                               <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
                                 {res.isExcluded
                                   ? '-'
-                                  : Math.round(round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0))).toString()}
+                                  : (() => {
+                                      const totalForDepot = round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0));
+                                      const halbeAnteile = matchedDepot?.gesamtHalbeAnteile ?? 1;
+                                      const perHalb = halbeAnteile > 0 ? Math.round(totalForDepot / halbeAnteile) : 0;
+                                      return perHalb.toString();
+                                    })()}
                               </td>
                             )}
                           {dist.unit === 'Stück' && dist.remainder > 0 && (
