@@ -497,9 +497,16 @@ function App() {
   return (
     <div className="app-layout">
       <header className="nav-header no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ color: 'var(--color-primary)' }}>SoLaWi App</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <img
+            src="/app_logo.png"
+            alt="SoLaWi Logo"
+            style={{ width: '44px', height: '44px', objectFit: 'contain' }}
+          />
+          <div>
+            <h1 style={{ color: 'var(--color-primary)' }}>SoLaWi App</h1>
           <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
+          </div>
         </div>
         
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
