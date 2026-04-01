@@ -500,11 +500,11 @@ function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img
             src="/app_logo.png"
-            alt="SoLaWi Logo"
+            alt="Auf dem Acker e.V. Logo"
             style={{ width: '44px', height: '44px', objectFit: 'contain' }}
           />
           <div>
-            <h1 style={{ color: 'var(--color-primary)' }}>SoLaWi App</h1>
+            <h1 style={{ color: 'var(--color-primary)' }}>Auf dem Acker e.V.</h1>
           <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
           </div>
         </div>
