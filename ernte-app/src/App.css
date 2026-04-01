@@ -25,13 +25,31 @@
 body {
   font-family: var(--font-base);
   background-color: var(--color-bg);
-  background-image: url('/farm_bg.png');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  position: relative;
   color: var(--color-text);
   line-height: 1.5;
   min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('/farm_bg_field.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  filter: blur(3px);
+  transform: scale(1.03);
+  z-index: -2;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.18);
+  z-index: -1;
 }
 
 .tab-button {
@@ -230,6 +248,26 @@ tr:hover td {
 
 /* Print Media */
 @media print {
+  body::before,
+  body::after {
+    display: none !important;
+  }
+  .print-preview-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: white !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .print-preview-paper {
+    background: white !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
   body {
     background: white !important;
     color: black !important;
@@ -271,6 +309,7 @@ tr:hover td {
     page-break-inside: avoid;
   }
   @page {
+    size: A4 portrait;
     margin: 1cm;
   }
   table, th, td {

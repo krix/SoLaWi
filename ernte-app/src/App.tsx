@@ -254,6 +254,9 @@ function App() {
 
   const [printMode, setPrintMode] = useState(false);
 
+  const round2 = (value: number) => Math.round(value * 100) / 100;
+  const toNetKg = (gross: number) => round2(gross * 0.95);
+
   const formatPrintAmount = (value: number, unit: string) => {
     return unit === 'Stück' ? Math.round(value).toString() : value.toFixed(2);
   };
@@ -332,17 +335,10 @@ function App() {
     const today = new Date();
     const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
 
-    let updatedHistory = [...historyData];
+    // Re-print on the same day should replace that day's rows instead of appending.
+    let updatedHistory = historyData.filter(row => row.datum !== todayStr);
 
     for (const dist of distributions) {
-       // Deduplicate: same article on the exact same date
-       updatedHistory = updatedHistory.filter(row => {
-          if (row.artikel === dist.articleName && row.datum === todayStr) {
-             return false;
-          }
-          return true;
-       });
-
        for (const depot of editableDepots) {
           const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
           const isExcluded = res?.isExcluded;
@@ -354,13 +350,14 @@ function App() {
           finalTotalAmount += allocatedRemainder;
 
           if (!isExcluded && finalTotalAmount > 0) {
-             let halberAnteilVal = finalTotalAmount / depot.gesamtHalbeAnteile;
+             const amountForHistory = dist.unit === 'kg' ? toNetKg(finalTotalAmount) : finalTotalAmount;
+             const halberAnteilVal = amountForHistory / depot.gesamtHalbeAnteile;
 
              updatedHistory.push({
                  datum: todayStr,
                  depot: depot.name,
                  artikel: dist.articleName,
-                 gesamtMenge: finalTotalAmount,
+                 gesamtMenge: amountForHistory,
                  ganzerAnteil: halberAnteilVal * 2,
                  halberAnteil: halberAnteilVal,
                  einheit: dist.unit
@@ -391,7 +388,7 @@ function App() {
 
   if (printMode) {
     return (
-      <div style={{
+      <div className="print-preview-overlay" style={{
         position: 'fixed',
         inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -402,7 +399,7 @@ function App() {
         overflow: 'auto',
         padding: '2rem'
       }}>
-        <div style={{
+        <div className="print-preview-paper" style={{
           backgroundColor: 'white',
           borderRadius: '8px',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
@@ -473,9 +470,15 @@ function App() {
                   {rows.map(row => (
                     <tr key={`${depot.kuerzel}-${row.id}`}>
                       <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.totalAmount, row.unit)} {formatPrintUnit(row.unit)}</td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.perHalb, row.unit)} {formatPrintUnit(row.unit)}</td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>{formatPrintAmount(row.perGanz, row.unit)} {formatPrintUnit(row.unit)}</td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.totalAmount) : row.totalAmount, row.unit)} {formatPrintUnit(row.unit)}
+                      </td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perHalb) : row.perHalb, row.unit)} {formatPrintUnit(row.unit)}
+                      </td>
+                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perGanz) : row.perGanz, row.unit)} {formatPrintUnit(row.unit)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -697,7 +700,14 @@ function App() {
                       <tr>
                         <th>Aktiv</th>
                         <th>Depot</th>
-                        <th>Menge ({dist.unit})</th>
+                        {dist.unit === 'kg' ? (
+                          <>
+                            <th>Brutto (kg)</th>
+                            <th>Netto (kg)</th>
+                          </>
+                        ) : (
+                          <th>Menge ({dist.unit})</th>
+                        )}
                         {dist.unit === 'Stück' && dist.remainder > 0 && <th>Rest zuteilen</th>}
                       </tr>
                     </thead>
@@ -727,9 +737,26 @@ function App() {
                              </span>
                              {res.isExcluded && <i style={{marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-danger)'}}>(ausgeschl.)</i>}
                           </td>
-                          <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
-                            {res.isExcluded ? '-' : res.calculatedAmount} 
-                          </td>
+                            {dist.unit === 'kg' ? (
+                              <>
+                                <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
+                                  {res.isExcluded
+                                    ? '-'
+                                    : round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0)).toFixed(2)}
+                                </td>
+                                <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
+                                  {res.isExcluded
+                                    ? '-'
+                                    : toNetKg(round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0))).toFixed(2)}
+                                </td>
+                              </>
+                            ) : (
+                              <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
+                                {res.isExcluded
+                                  ? '-'
+                                  : Math.round(round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0))).toString()}
+                              </td>
+                            )}
                           {dist.unit === 'Stück' && dist.remainder > 0 && (
                             <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
                               {!res.isExcluded && (
