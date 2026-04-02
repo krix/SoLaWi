@@ -233,14 +233,22 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
          runningTotals[kuerzel] += d.deliveries[kuerzel];
       }
       
-      // Build the data point for Recharts
-      const dataPoint: any = { datum: d.rawDate.substring(0,5) };
+      // Use full date as X key to avoid duplicate labels/clipping artifacts.
+      const dataPoint: any = { datum: d.rawDate };
       allDepots.forEach(dep => {
          dataPoint[dep.kuerzel] = runningTotals[dep.kuerzel];
       });
       return dataPoint;
     });
   }, [filterArticle, baseFilteredData]);
+
+  const formatChartDateLabel = (value: string) => {
+    if (!value || typeof value !== 'string') return value;
+    const parts = value.split('.');
+    if (parts.length !== 3) return value;
+    const [day, month, year] = parts;
+    return selectedYear === 'Alle' ? `${day}.${month}.${year.slice(-2)}` : `${day}.${month}`;
+  };
 
   // Aggregation for Total Harvest table (+5% Schwund)
   const harvestStats = useMemo(() => {
@@ -372,9 +380,16 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
               Die Linien zeigen an, wie viel ein Anteil über die Zeit aufsummiert erhalten hat. Laufen die Linien parallel oder übereinander, war die Erntezeit extrem fair.
             </p>
             <ResponsiveContainer width="100%" height="80%">
-              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+              <LineChart data={chartData} margin={{ top: 5, right: 28, bottom: 5, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-                <XAxis dataKey="datum" stroke="#888" fontSize={12} />
+                <XAxis
+                  dataKey="datum"
+                  stroke="#888"
+                  fontSize={12}
+                  interval="preserveStartEnd"
+                  minTickGap={20}
+                  tickFormatter={formatChartDateLabel}
+                />
                 <YAxis stroke="#888" fontSize={12} domain={['auto', 'auto']} />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Tooltip
@@ -383,6 +398,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
                   labelStyle={{ margin: 0, fontSize: '11px', color: '#6b7280' }}
                   itemStyle={{ padding: 0, margin: '1px 0' }}
                   formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : value}
+                  labelFormatter={(label: any) => formatChartDateLabel(String(label))}
                 />
                 {allDepots.map((d, i) => (
                   <Line 
@@ -391,6 +407,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
                     dataKey={d.kuerzel} 
                     stroke={`hsl(${i * (360 / allDepots.length)}, 70%, 50%)`} 
                     strokeWidth={2}
+                    isAnimationActive={false}
                     dot={{ r: 3 }}
                     activeDot={{ r: 6 }}
                     connectNulls
