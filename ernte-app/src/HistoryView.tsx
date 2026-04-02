@@ -317,7 +317,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
         </div>
       </div>
 
-      <div className={printingSpecific ? 'no-print' : ''} style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
+      <div className={printingSpecific ? 'no-print' : ''} style={{ marginBottom: '1.4rem', paddingBottom: '1.2rem', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
            <label style={{ fontWeight: 500, color: 'var(--color-text)' }}>Verlauf / Fairness pro Artikel anzeigen:</label>
            <select 
@@ -332,7 +332,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
         </div>
 
         {filterArticle !== 'Alle' && chartData.length > 0 && (
-          <div style={{ marginBottom: '3rem', height: '400px', width: '100%', background: 'var(--color-surface-solid)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+          <div style={{ marginBottom: '1rem', height: '400px', width: '100%', background: 'var(--color-surface-solid)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
             <h3 style={{ fontSize: '1rem', marginBottom: '1rem', textAlign: 'center', color: 'var(--color-text)' }}>
               Kumulierter Fairness-Verlauf: {filterArticle} (Menge pro 1 Halbem Anteil)
             </h3>
@@ -346,8 +346,10 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
                 <YAxis stroke="#888" fontSize={12} domain={['auto', 'auto']} />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
                 <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 100 }}
+                  contentStyle={{ borderRadius: '6px', border: 'none', boxShadow: '0 3px 10px rgba(0,0,0,0.12)', zIndex: 100, padding: '6px 8px', fontSize: '12px', lineHeight: 1.25 }}
                   wrapperStyle={{ zIndex: 100 }}
+                  labelStyle={{ margin: 0, fontSize: '11px', color: '#6b7280' }}
+                  itemStyle={{ padding: 0, margin: '1px 0' }}
                   formatter={(value: any) => typeof value === 'number' ? value.toFixed(2) : value}
                 />
                 {allDepots.map((d, i) => (
@@ -375,7 +377,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
       </div>
 
       {/* Depot-Lieferstatistik */}
-      <div className={`table-container ${printingSpecific === 'harvest' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'depots' ? 'none' : '', borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: '2rem' }}>
+      <div className={`table-container ${printingSpecific === 'harvest' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'depots' ? 'none' : '' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(46, 165, 80, 0.05)', padding: '1rem' }}>
            <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', margin: 0 }}>Depot-Lieferstatistik (Netto)</h3>
            <div className="no-print" style={{ display: 'flex', gap: '0.5rem' }}>
@@ -432,7 +434,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
       </div>
 
       {/* Gesamternte / Gemüsesorte */}
-      <div className={`table-container ${printingSpecific === 'depots' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'harvest' ? 'none' : '' }}>
+      <div className={`table-container ${printingSpecific === 'depots' ? 'no-print' : ''}`} style={{ border: printingSpecific === 'harvest' ? 'none' : '', marginTop: '1.6rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(46, 165, 80, 0.05)', padding: '1rem' }}>
           <h3 style={{ fontSize: '1.2rem', color: 'var(--color-primary)', margin: 0 }}>Gesamternte / Gemüsesorte (Brutto, inkl. 5% Schwund)</h3>
           <div className="no-print" style={{ display: 'flex', gap: '0.5rem' }}>

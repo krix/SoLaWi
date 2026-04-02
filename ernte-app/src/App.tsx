@@ -515,13 +515,13 @@ function App() {
   }
 
   return (
-    <div className="app-layout">
+    <div className="app-layout compact-mode">
       <header className="nav-header no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div className="header-left" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img
             src="/app_logo.png"
             alt="Auf dem Acker e.V. Logo"
-            style={{ width: '44px', height: '44px', objectFit: 'contain' }}
+            className="app-logo"
           />
           <div>
             <h1 style={{ color: 'var(--color-primary)' }}>AckerApp</h1>
@@ -529,9 +529,9 @@ function App() {
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-            <button 
+        <div className="header-controls" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div className="tab-group" style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+            <button
                className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
                onClick={() => setActiveTab('calculator')}
              >
@@ -551,7 +551,7 @@ function App() {
              </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div className="year-select-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-light)' }}>Erntejahr:</span>
             <select 
               className="input" 
@@ -562,6 +562,7 @@ function App() {
               {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
+
         </div>
 
         {activeTab === 'calculator' ? (
@@ -574,8 +575,8 @@ function App() {
       </header>
 
       {activeTab === 'calculator' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 350px) 1fr', gap: '2rem' }}>
-          
+        <div className="calculator-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 350px) 1fr', gap: '2rem' }}>
+
           {/* Sidebar / Form */}
           <div>
             <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
@@ -626,8 +627,8 @@ function App() {
 
               return (
               <div key={dist.id} className="glass-panel animate-in" style={{ padding: '1.5rem', marginBottom: '1.5rem', animationDelay: `${idx * 0.1}s` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ flex: '0 0 32%', maxWidth: '360px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{dist.articleName}</h3>
                       
@@ -652,17 +653,16 @@ function App() {
                     <span style={{ fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
                       Rechnerisch entspricht ein <strong style={{color: 'var(--color-primary)'}}>halber Anteil ca. {dist.unit === 'kg' ? `${Math.round(dist.sharePerHalb * 1000).toLocaleString('de-DE')} g` : `${dist.sharePerHalb} ${dist.unit}`}</strong>.
                     </span>
+                    {dist.unit === 'Stück' && dist.sharePerHalb < 1 && (
+                      <div style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)', fontSize: '0.85rem', marginTop: '0.55rem' }}>
+                        ⚠️ <strong>Achtung:</strong> Die Menge reicht nicht für mindestens 1 Stück pro Person. Bitte Depots ausschließen!
+                      </div>
+                    )}
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    {dist.unit === 'Stück' && dist.sharePerHalb < 1 && (
-                      <div style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)', fontSize: '0.85rem', maxWidth: '250px' }}>
-                         ⚠️ <strong>Achtung:</strong> Die Menge reicht nicht für mindestens 1 Stück pro Person. Bitte Depots ausschließen!
-                       </div>
-                     )}
-
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: '1 1 68%', minWidth: 0 }}>
                      {dist.remainder > 0 && (
-                       <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)' }}>
+                       <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)', flex: '1 1 auto', minWidth: 0 }}>
                          <div style={{ fontWeight: 500, color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                            📦 Rest: {dist.remainder} {dist.unit} übrig
                          </div>

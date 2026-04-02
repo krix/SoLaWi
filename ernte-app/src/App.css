@@ -225,6 +225,82 @@ tr:hover td {
   padding: 2rem;
 }
 
+.app-logo {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* Optional compact UI scaling for low-resolution displays. */
+.app-layout.compact-mode {
+  zoom: 0.88;
+}
+
+.app-layout.compact-mode .app-logo {
+  width: 92px;
+  height: 92px;
+}
+
+.app-layout.compact-mode .nav-header {
+  padding: 1.1rem 1.4rem;
+}
+
+.app-layout.compact-mode .tab-button {
+  font-size: 0.9rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.app-layout.compact-mode .button,
+.app-layout.compact-mode .input,
+.app-layout.compact-mode th,
+.app-layout.compact-mode td {
+  font-size: 0.9rem;
+}
+
+.app-layout.compact-mode .glass-panel {
+  border-radius: 10px;
+}
+
+@media (max-width: 1200px) {
+  .header-controls {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .calculator-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .nav-header {
+    position: static;
+    margin: 0 0 1.2rem 0;
+    padding: 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+
+  .header-left {
+    justify-content: center;
+  }
+
+  .header-controls {
+    justify-content: center;
+  }
+
+  .tab-group {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .year-select-group {
+    justify-content: center;
+  }
+}
+
 .nav-header {
   display: flex;
   align-items: center;
