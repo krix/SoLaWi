@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
-// Pull in the auto-generated function `embedded_historie_files()` that
+// Pull in the auto-generated function `embedded_data_files()` that
 // returns Vec<(&str, &str)> with (filename, json_content) pairs.
 include!(concat!(env!("OUT_DIR"), "/embedded_historie.rs"));
 
@@ -115,30 +115,28 @@ fn get_data_dir(app: &tauri::AppHandle) -> PathBuf {
     }
 }
 
-/// Called once during app setup.  For **release** builds it ensures the
-/// writable app-data directory exists and seeds it with the historie data
-/// that is compiled into the binary (no external resource files needed).
+/// Called once during app setup. Ensures the writable data directory exists
+/// and seeds missing JSON files from data compiled into the binary.
 fn init_data_dir(app: &tauri::AppHandle) {
     let data_dir = get_data_dir(app);
     eprintln!("[data-init] data_dir = {}", data_dir.display());
 
+    // Create directory if necessary.
+    if !data_dir.exists() {
+        let _ = fs::create_dir_all(&data_dir);
+    }
+
+    // Seed missing JSON files (historie-*.json + stammdaten.json).
+    for (filename, content) in embedded_data_files() {
+        let dst = data_dir.join(filename);
+        if !dst.exists() {
+            let _ = fs::write(&dst, content);
+            eprintln!("[data-init] Seeded {}", dst.display());
+        }
+    }
+
     #[cfg(not(debug_assertions))]
     {
-        // Create directory if necessary
-        if !data_dir.exists() {
-            let _ = fs::create_dir_all(&data_dir);
-        }
-
-        // 1. Seed from data embedded in the binary (historie-*.json).
-        //    Only writes files that do not already exist (first launch).
-        for (filename, content) in embedded_historie_files() {
-            let dst = data_dir.join(filename);
-            if !dst.exists() {
-                let _ = fs::write(&dst, content);
-                eprintln!("[data-init] Seeded {}", dst.display());
-            }
-        }
-
         // 2. Legacy migration: users upgrading from v1.0.0 may still
         //    have data files next to the executable.  Copy any that are
         //    missing in app_data_dir (won't overwrite newer files).

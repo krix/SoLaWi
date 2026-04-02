@@ -22,17 +22,6 @@ type PrintOverviewRow = {
   amountsByDepot: Record<string, number>;
 };
 
-const LS_ARTICLES = 'solawi_articles';
-const LS_DEPOTS   = 'solawi_depots';
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch {}
-  return fallback;
-}
-
 function getArticleSelectionKey(article: Pick<Article, 'name' | 'unit'>): string {
   return `${article.name}__${article.unit}`;
 }
@@ -82,7 +71,7 @@ function App() {
   const [editableArticles, setEditableArticlesRaw] = useState<Article[]>(UNIQUE_ARTICLES);
   const [editableDepots, setEditableDepotsRaw] = useState<Depot[]>(DEPOTS);
 
-  // Initial load from backend (or secondary localStorage)
+  // Initial load from backend JSON file only
   useEffect(() => {
     const initMasterData = async () => {
       try {
@@ -92,19 +81,13 @@ function App() {
         let initialArticles = UNIQUE_ARTICLES;
         let initialDepots = DEPOTS;
 
-        // Try Backend File first
+        // Source of truth: stammdaten.json
         if (parsed.articles && Array.isArray(parsed.articles) && parsed.articles.length > 0) {
           initialArticles = parsed.articles;
-        } else {
-          // Fallback to LocalStorage
-          initialArticles = loadFromStorage<Article[]>(LS_ARTICLES, UNIQUE_ARTICLES);
         }
 
         if (parsed.depots && Array.isArray(parsed.depots) && parsed.depots.length > 0) {
           initialDepots = parsed.depots;
-        } else {
-          // Fallback to LocalStorage
-          initialDepots = loadFromStorage<Depot[]>(LS_DEPOTS, DEPOTS);
         }
 
         setEditableArticlesRaw(initialArticles);
@@ -117,20 +100,18 @@ function App() {
   }, []);
 
   const setEditableArticles = (articles: Article[]) => {
-    localStorage.setItem(LS_ARTICLES, JSON.stringify(articles));
     setEditableArticlesRaw(articles);
-    // Explicit sync to backend
-    invoke('save_master_data', { 
+    // Persist exclusively to stammdaten.json via backend.
+    invoke('save_master_data', {
       articlesJson: JSON.stringify(articles), 
       depotsJson: JSON.stringify(editableDepots) 
     }).catch(console.error);
   };
 
   const setEditableDepots = (depots: Depot[]) => {
-    localStorage.setItem(LS_DEPOTS, JSON.stringify(depots));
     setEditableDepotsRaw(depots);
-    // Explicit sync to backend
-    invoke('save_master_data', { 
+    // Persist exclusively to stammdaten.json via backend.
+    invoke('save_master_data', {
       articlesJson: JSON.stringify(editableArticles), 
       depotsJson: JSON.stringify(depots) 
     }).catch(console.error);
