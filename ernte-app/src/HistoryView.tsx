@@ -28,6 +28,21 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleDateInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    setter: (value: string) => void
+  ) => {
+    setter(event.target.value);
+    // WebKit/Linux date picker can stay open after selection; blur closes it reliably.
+    setTimeout(() => event.target.blur(), 0);
+  };
+
+  const handleDateInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.currentTarget.blur();
+    }
+  };
+
   const saveHistory = async (year: string, updatedHistory: any[]) => {
     const jsonContent = JSON.stringify(updatedHistory, null, 2);
     try {
@@ -296,19 +311,36 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
           </div>
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="history-date-filter-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'nowrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '148px' }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.2rem' }}>Von</label>
-            <input type="date" className="input" style={{ padding: '0.2rem', fontSize: '0.9rem' }} value={startDate} onChange={e => setStartDate(e.target.value)} />
+            <input
+              type="date"
+              className="input"
+              style={{ padding: '0.2rem', fontSize: '0.9rem' }}
+              value={startDate}
+              onChange={e => handleDateInputChange(e, setStartDate)}
+              onKeyDown={handleDateInputKeyDown}
+            />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '148px' }}>
             <label style={{ fontSize: '0.8rem', color: 'var(--color-text-light)', marginBottom: '0.2rem' }}>Bis</label>
-            <input type="date" className="input" style={{ padding: '0.2rem', fontSize: '0.9rem' }} value={endDate} onChange={e => setEndDate(e.target.value)} />
+            <input
+              type="date"
+              className="input"
+              style={{ padding: '0.2rem', fontSize: '0.9rem' }}
+              value={endDate}
+              onChange={e => handleDateInputChange(e, setEndDate)}
+              onKeyDown={handleDateInputKeyDown}
+            />
+          </div>
           </div>
           {(startDate || endDate) && (
             <button 
-              className="button outline" 
-              style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', height: 'fit-content', alignSelf: 'flex-end', marginBottom: '4px' }}
+              type="button"
+              className="button outline"
+              style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', alignSelf: 'flex-end', whiteSpace: 'nowrap' }}
               onClick={() => { setStartDate(''); setEndDate(''); }}
             >
               🔄 Filter zurücksetzen

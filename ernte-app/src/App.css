@@ -262,6 +262,17 @@ tr:hover td {
   border-radius: 10px;
 }
 
+.history-date-filter-box {
+  min-width: 320px;
+}
+
+@media (max-width: 720px) {
+  .history-date-filter-box {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 @media (max-width: 1200px) {
   .header-controls {
     flex-wrap: wrap;
