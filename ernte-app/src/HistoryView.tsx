@@ -380,7 +380,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
               Die Linien zeigen an, wie viel ein Anteil über die Zeit aufsummiert erhalten hat. Laufen die Linien parallel oder übereinander, war die Erntezeit extrem fair.
             </p>
             <ResponsiveContainer width="100%" height="80%">
-              <LineChart data={chartData} margin={{ top: 5, right: 28, bottom: 5, left: 8 }}>
+              <LineChart data={chartData} margin={{ top: 5, right: 40, bottom: 5, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
                 <XAxis
                   dataKey="datum"
@@ -389,6 +389,7 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
                   interval="preserveStartEnd"
                   minTickGap={20}
                   tickFormatter={formatChartDateLabel}
+                  padding={{ left: 10, right: 20 }}
                 />
                 <YAxis stroke="#888" fontSize={12} domain={['auto', 'auto']} />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
