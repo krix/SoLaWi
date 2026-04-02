@@ -1,9 +1,9 @@
 [package]
 name = "ernte-app"
-version = "1.1.0"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
+version = "1.1.1"
+description = "Acker App"
+authors = ["Auf dem Acker e.V."]
+edition = "2026"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
