@@ -249,17 +249,21 @@ function App() {
     }));
   };
 
-  const [printMode, setPrintMode] = useState(false);
+  const [printMode, setPrintMode] = useState<'overview' | 'depots' | null>(null);
 
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const toNetKg = (gross: number) => round2(gross * 0.95);
 
-  const formatPrintAmount = (value: number, unit: string) => {
-    return unit === 'Stück' ? Math.round(value).toString() : value.toFixed(2);
+  const formatPrintAmount = (value: number, unit: string, forceGrams = false) => {
+    if (unit === 'Stück') return Math.round(value).toString();
+    if (unit === 'kg' && forceGrams) return Math.round(value * 1000).toString();
+    return value.toFixed(2);
   };
 
-  const formatPrintUnit = (unit: string) => {
-    return unit === 'Stück' ? 'St.' : unit;
+  const formatPrintUnit = (unit: string, forceGrams = false) => {
+    if (unit === 'Stück') return 'St.';
+    if (unit === 'kg' && forceGrams) return 'g';
+    return unit;
   };
 
   const printData = useMemo(() => {
@@ -326,7 +330,7 @@ function App() {
     return { byDepot, overviewRows };
   }, [distributions, editableDepots]);
 
-  const handlePrint = async () => {
+  const handlePrint = async (mode: 'overview' | 'depots') => {
     if (activeTab !== 'calculator' || distributions.length === 0) return;
     
     const today = new Date();
@@ -376,10 +380,10 @@ function App() {
         alert("Achtung: Konnte die Historie nicht dauerhaft speichern! Läuft das Backend?");
     }
 
-    setPrintMode(true);
+    setPrintMode(mode);
     setTimeout(() => {
       window.print();
-      setPrintMode(false);
+      setPrintMode(null);
     }, 500);
   };
 
@@ -407,6 +411,7 @@ function App() {
           padding: '2rem'
         }}>
           <div className="print-layout">
+            {printMode === 'overview' && (
             <section className="print-summary-block">
           <h2>Gesamtverteilung über alle Depots</h2>
           <p style={{ marginBottom: '1rem', color: '#666' }}>Datum: {printDate}</p>
@@ -446,8 +451,9 @@ function App() {
           </table>
           {printData.overviewRows.length === 0 && <p>Keine Ernte eingetragen.</p>}
         </section>
+            )}
 
-        {editableDepots.map(depot => {
+        {printMode === 'depots' && editableDepots.map(depot => {
           const rows = printData.byDepot[depot.kuerzel] || [];
 
           return (
@@ -472,13 +478,13 @@ function App() {
                     <tr key={`${depot.kuerzel}-${row.id}`}>
                       <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
                       <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.totalAmount) : row.totalAmount, row.unit)} {formatPrintUnit(row.unit)}
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.totalAmount) : row.totalAmount, row.unit, true)} {formatPrintUnit(row.unit, true)}
                       </td>
                       <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perHalb) : row.perHalb, row.unit)} {formatPrintUnit(row.unit)}
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perHalb) : row.perHalb, row.unit, true)} {formatPrintUnit(row.unit, true)}
                       </td>
                       <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perGanz) : row.perGanz, row.unit)} {formatPrintUnit(row.unit)}
+                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perGanz) : row.perGanz, row.unit, true)} {formatPrintUnit(row.unit, true)}
                       </td>
                     </tr>
                   ))}
@@ -547,9 +553,14 @@ function App() {
         </div>
 
         {activeTab === 'calculator' ? (
-          <button className="button" onClick={handlePrint} disabled={distributions.length === 0}>
-              🖨️ Verteilliste drucken
-           </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="button outline" style={{ backgroundColor: 'white' }} onClick={() => handlePrint('overview')} disabled={distributions.length === 0}>
+                🖨️ Gesamtverteilung
+             </button>
+            <button className="button" onClick={() => handlePrint('depots')} disabled={distributions.length === 0}>
+                🖨️ Depots
+             </button>
+          </div>
         ) : (
           <div style={{ width: '200px' }}></div>
         )}
