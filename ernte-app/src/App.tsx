@@ -414,7 +414,7 @@ function App() {
             {`
               @media print {
                 @page {
-                  size: ${printMode === 'overview' ? 'A4 landscape' : 'A4 portrait'};
+                  size: ${printMode === 'overview' ? 'landscape' : 'portrait'};
                   margin: 1cm;
                 }
               }
