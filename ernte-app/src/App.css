@@ -73,7 +73,12 @@ body::after {
   border-bottom: 2px solid var(--color-primary);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: 600;
   color: var(--color-text);
   line-height: 1.2;
@@ -121,6 +126,7 @@ h1, h2, h3, h4, h5, h6 {
 .button:active:not(:disabled) {
   transform: translateY(0);
 }
+
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -131,6 +137,7 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--color-primary);
   border: 1px solid var(--color-primary);
 }
+
 .button.outline:hover:not(:disabled) {
   background: rgba(46, 165, 80, 0.1);
 }
@@ -138,7 +145,7 @@ h1, h2, h3, h4, h5, h6 {
 .input {
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid rgba(0,0,0,0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 6px;
   font-family: inherit;
   font-size: 0.95rem;
@@ -155,6 +162,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-group {
   margin-bottom: 1rem;
 }
+
 .form-group label {
   display: block;
   font-weight: 500;
@@ -186,7 +194,7 @@ th {
 
 td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   vertical-align: middle;
 }
 
@@ -210,8 +218,15 @@ tr:hover td {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-in {
@@ -273,7 +288,7 @@ tr:hover td {
   }
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1300px) {
   .header-controls {
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -319,7 +334,7 @@ tr:hover td {
   margin-bottom: 2rem;
   padding: 1.5rem 2rem;
   border-bottom: 2px solid var(--color-border);
-  
+
   /* Sticky Header */
   position: sticky;
   top: 0;
@@ -335,10 +350,12 @@ tr:hover td {
 
 /* Print Media */
 @media print {
+
   body::before,
   body::after {
     display: none !important;
   }
+
   .print-preview-overlay {
     position: static !important;
     inset: auto !important;
@@ -347,6 +364,7 @@ tr:hover td {
     overflow: visible !important;
     padding: 0 !important;
   }
+
   .print-preview-paper {
     background: white !important;
     border-radius: 0 !important;
@@ -355,60 +373,75 @@ tr:hover td {
     max-width: none !important;
     padding: 0 !important;
   }
+
   body {
     background: white !important;
     color: black !important;
     font-size: 12pt;
   }
+
   .no-print {
     display: none !important;
   }
+
   .glass-panel {
     box-shadow: none !important;
     border: none !important;
     backdrop-filter: none !important;
     background: white !important;
   }
+
   .app-layout {
     padding: 0;
   }
+
   .print-layout {
     padding: 0;
   }
+
   .print-title-block {
     margin-bottom: 0.8cm;
     break-inside: avoid;
   }
+
   @page landscape-page {
     size: A4 landscape;
     margin: 1cm;
   }
+
   .print-summary-block {
     page: landscape-page;
     margin-bottom: 0.8cm;
     break-inside: avoid;
     page-break-inside: avoid;
   }
+
   .print-overview-table th,
   .print-overview-table td {
     white-space: nowrap;
     font-size: 10pt;
     padding: 6px !important;
   }
+
   .print-depot-block {
     margin-bottom: 0.75cm;
     break-inside: avoid;
     page-break-inside: avoid;
     min-height: 7.5cm;
   }
+
   @page {
     size: A4 portrait;
     margin: 1cm;
   }
-  table, th, td {
+
+  table,
+  th,
+  td {
     border: 1px solid #ccc !important;
   }
+
   th {
-     background-color: #f0f0f0 !important;
+    background-color: #f0f0f0 !important;
   }
 }

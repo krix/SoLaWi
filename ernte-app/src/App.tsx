@@ -77,7 +77,7 @@ function App() {
       try {
         const raw = await invoke<string>('load_master_data');
         const parsed = JSON.parse(raw);
-        
+
         let initialArticles = UNIQUE_ARTICLES;
         let initialDepots = DEPOTS;
 
@@ -103,8 +103,8 @@ function App() {
     setEditableArticlesRaw(articles);
     // Persist exclusively to stammdaten.json via backend.
     invoke('save_master_data', {
-      articlesJson: JSON.stringify(articles), 
-      depotsJson: JSON.stringify(editableDepots) 
+      articlesJson: JSON.stringify(articles),
+      depotsJson: JSON.stringify(editableDepots)
     }).catch(console.error);
   };
 
@@ -112,8 +112,8 @@ function App() {
     setEditableDepotsRaw(depots);
     // Persist exclusively to stammdaten.json via backend.
     invoke('save_master_data', {
-      articlesJson: JSON.stringify(editableArticles), 
-      depotsJson: JSON.stringify(depots) 
+      articlesJson: JSON.stringify(editableArticles),
+      depotsJson: JSON.stringify(depots)
     }).catch(console.error);
   };
 
@@ -136,9 +136,9 @@ function App() {
   const fairnessByArticle = useMemo(() => {
     const map: Record<string, Record<string, 'viel' | 'wenig' | 'normal'>> = {};
     for (const d of distributions) {
-        if (!map[d.articleName]) {
-            map[d.articleName] = getFairnessRatio(d.articleName, historyData, editableDepots);
-        }
+      if (!map[d.articleName]) {
+        map[d.articleName] = getFairnessRatio(d.articleName, historyData, editableDepots);
+      }
     }
     return map;
   }, [distributions, editableDepots]);
@@ -154,18 +154,18 @@ function App() {
     }
     return calculatePieceRemainderAllocation(dist.remainder, dist.geschenkeDepotKuerzel, dist.excludedDepots, editableDepots);
   };
-  
+
   const handleAddHarvest = () => {
     if (typeof amount !== 'number' || amount <= 0) return;
     const article = editableArticles.find(a => getArticleSelectionKey(a) === selectedArticle) as Article;
     if (!article) return;
-    
+
     // Check if already exists
     if (distributions.find(d => d.articleName === article.name && d.unit === article.unit)) {
       alert("Artikel wurde bereits zur Ernte hinzugefügt!");
       return;
     }
-    
+
     const newDist = calculateDistribution(article.name, article.unit, amount, [], editableDepots);
     setDistributions(prev => [newDist, ...prev]);
     setAmount('');
@@ -184,9 +184,9 @@ function App() {
           }
           newExcluded.push(depotKuerzel);
         }
-        
+
         let recalcDist = calculateDistribution(dist.articleName, dist.unit, dist.totalHarvested, newExcluded, editableDepots);
-        recalcDist.id = dist.id; 
+        recalcDist.id = dist.id;
         recalcDist.geschenkeDepotKuerzel = (
           recalcDist.unit === 'Stück' && recalcDist.remainder > 0
             ? dist.geschenkeDepotKuerzel.filter(kuerzel => !newExcluded.includes(kuerzel))
@@ -237,7 +237,7 @@ function App() {
     setDistributions(distributions.map(dist => {
       if (dist.id === distId) {
         let recalcDist = calculateDistribution(dist.articleName, dist.unit, newAmount, dist.excludedDepots, editableDepots);
-        recalcDist.id = dist.id; 
+        recalcDist.id = dist.id;
         recalcDist.geschenkeDepotKuerzel = (
           recalcDist.unit === 'Stück' && recalcDist.remainder > 0
             ? dist.geschenkeDepotKuerzel.filter(kuerzel => !recalcDist.excludedDepots.includes(kuerzel))
@@ -332,7 +332,7 @@ function App() {
 
   const handlePrint = async (mode: 'overview' | 'depots') => {
     if (activeTab !== 'calculator' || distributions.length === 0) return;
-    
+
     const today = new Date();
     const todayStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
 
@@ -340,44 +340,44 @@ function App() {
     let updatedHistory = historyData.filter(row => row.datum !== todayStr);
 
     for (const dist of distributions) {
-       for (const depot of editableDepots) {
-          const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
-          const isExcluded = res?.isExcluded;
-          const calculatedAmount = res?.calculatedAmount || 0;
-          const remainderAllocation = getRemainderAllocation(dist);
-          const allocatedRemainder = remainderAllocation.allocationsByDepot[depot.kuerzel] || 0;
-          
-          let finalTotalAmount = calculatedAmount;
-          finalTotalAmount += allocatedRemainder;
+      for (const depot of editableDepots) {
+        const res = dist.results.find(r => r.depotKuerzel === depot.kuerzel);
+        const isExcluded = res?.isExcluded;
+        const calculatedAmount = res?.calculatedAmount || 0;
+        const remainderAllocation = getRemainderAllocation(dist);
+        const allocatedRemainder = remainderAllocation.allocationsByDepot[depot.kuerzel] || 0;
 
-          if (!isExcluded && finalTotalAmount > 0) {
-             const amountForHistory = dist.unit === 'kg' ? toNetKg(finalTotalAmount) : finalTotalAmount;
-             const halberAnteilVal = amountForHistory / depot.gesamtHalbeAnteile;
+        let finalTotalAmount = calculatedAmount;
+        finalTotalAmount += allocatedRemainder;
 
-             updatedHistory.push({
-                 datum: todayStr,
-                 depot: depot.name,
-                 artikel: dist.articleName,
-                 gesamtMenge: amountForHistory,
-                 ganzerAnteil: halberAnteilVal * 2,
-                 halberAnteil: halberAnteilVal,
-                 einheit: dist.unit
-             });
-          }
-       }
+        if (!isExcluded && finalTotalAmount > 0) {
+          const amountForHistory = dist.unit === 'kg' ? toNetKg(finalTotalAmount) : finalTotalAmount;
+          const halberAnteilVal = amountForHistory / depot.gesamtHalbeAnteile;
+
+          updatedHistory.push({
+            datum: todayStr,
+            depot: depot.name,
+            artikel: dist.articleName,
+            gesamtMenge: amountForHistory,
+            ganzerAnteil: halberAnteilVal * 2,
+            halberAnteil: halberAnteilVal,
+            einheit: dist.unit
+          });
+        }
+      }
     }
 
     const year = getHarvestYear(todayStr);
-    
+
     // Safety: only sync rows belonging to the current target harvest year
     const jsonForSync = updatedHistory.filter(row => getHarvestYear(row.datum) === year);
     const jsonContent = JSON.stringify(jsonForSync, null, 2);
 
     try {
-        await invoke('sync_history', { year, jsonContent });
+      await invoke('sync_history', { year, jsonContent });
     } catch (e) {
-        console.error("Failed to sync history:", e);
-        alert("Achtung: Konnte die Historie nicht dauerhaft speichern! Läuft das Backend?");
+      console.error("Failed to sync history:", e);
+      alert("Achtung: Konnte die Historie nicht dauerhaft speichern! Läuft das Backend?");
     }
 
     setPrintMode(mode);
@@ -412,89 +412,89 @@ function App() {
         }}>
           <div className="print-layout">
             {printMode === 'overview' && (
-            <section className="print-summary-block">
-          <h2>Gesamtverteilung über alle Depots</h2>
-          <p style={{ marginBottom: '1rem', color: '#666' }}>Datum: {printDate}</p>
-          <table className="print-overview-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
-            <thead>
-              <tr>
-                <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
-                {editableDepots.map(depot => (
-                  <th key={`overview-header-${depot.kuerzel}`} style={{ borderBottom: '2px solid black', padding: '8px' }}>
-                    {depot.kuerzel}
-                  </th>
-                ))}
-                <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Summe</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printData.overviewRows.map(row => (
-                <tr key={`overall-${row.id}`}>
-                  <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
-                  {editableDepots.map(depot => {
-                    const amount = row.amountsByDepot[depot.kuerzel] || 0;
-                    return (
-                      <td key={`overview-cell-${row.id}-${depot.kuerzel}`} style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {amount > 0 ? `${formatPrintAmount(amount, row.unit)} ${formatPrintUnit(row.unit)}` : '-'}
-                      </td>
-                    );
-                  })}
-                  <td style={{ borderBottom: '1px solid #ddd', padding: '8px', fontWeight: 600 }}>
-                    {`${formatPrintAmount(
-                      editableDepots.reduce((sum, depot) => sum + (row.amountsByDepot[depot.kuerzel] || 0), 0),
-                      row.unit
-                    )} ${formatPrintUnit(row.unit)}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {printData.overviewRows.length === 0 && <p>Keine Ernte eingetragen.</p>}
-        </section>
+              <section className="print-summary-block">
+                <h2>Gesamtverteilung über alle Depots</h2>
+                <p style={{ marginBottom: '1rem', color: '#666' }}>Datum: {printDate}</p>
+                <table className="print-overview-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
+                      {editableDepots.map(depot => (
+                        <th key={`overview-header-${depot.kuerzel}`} style={{ borderBottom: '2px solid black', padding: '8px' }}>
+                          {depot.kuerzel}
+                        </th>
+                      ))}
+                      <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Summe</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {printData.overviewRows.map(row => (
+                      <tr key={`overall-${row.id}`}>
+                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
+                        {editableDepots.map(depot => {
+                          const amount = row.amountsByDepot[depot.kuerzel] || 0;
+                          return (
+                            <td key={`overview-cell-${row.id}-${depot.kuerzel}`} style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                              {amount > 0 ? `${formatPrintAmount(amount, row.unit)} ${formatPrintUnit(row.unit)}` : '-'}
+                            </td>
+                          );
+                        })}
+                        <td style={{ borderBottom: '1px solid #ddd', padding: '8px', fontWeight: 600 }}>
+                          {`${formatPrintAmount(
+                            editableDepots.reduce((sum, depot) => sum + (row.amountsByDepot[depot.kuerzel] || 0), 0),
+                            row.unit
+                          )} ${formatPrintUnit(row.unit)}`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {printData.overviewRows.length === 0 && <p>Keine Ernte eingetragen.</p>}
+              </section>
             )}
 
-        {printMode === 'depots' && editableDepots.map(depot => {
-          const rows = printData.byDepot[depot.kuerzel] || [];
+            {printMode === 'depots' && editableDepots.map(depot => {
+              const rows = printData.byDepot[depot.kuerzel] || [];
 
-          return (
-            <section key={depot.kuerzel} className="print-depot-block">
-              <h2>Depot: {depot.name}</h2>
-              <p style={{ marginBottom: '1rem', color: '#666', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                <span>Gesamt: {depot.gesamtHalbeAnteile} Halbe Anteile ({depot.halbeAnteile} Halbe, {depot.ganzeAnteile} Ganze)</span>
-                <span style={{ marginLeft: 'auto', textAlign: 'right' }}>Datum: {printDate}</span>
-              </p>
+              return (
+                <section key={depot.kuerzel} className="print-depot-block">
+                  <h2>Depot: {depot.name}</h2>
+                  <p style={{ marginBottom: '1rem', color: '#666', display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span>Gesamt: {depot.gesamtHalbeAnteile} Halbe Anteile ({depot.halbeAnteile} Halbe, {depot.ganzeAnteile} Ganze)</span>
+                    <span style={{ marginLeft: 'auto', textAlign: 'right' }}>Datum: {printDate}</span>
+                  </p>
 
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
-                <thead>
-                  <tr>
-                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
-                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Gesamtmenge fuer Depot</th>
-                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen halben Anteil</th>
-                    <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen ganzen Anteil</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map(row => (
-                    <tr key={`${depot.kuerzel}-${row.id}`}>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.totalAmount) : row.totalAmount, row.unit, true)} {formatPrintUnit(row.unit, true)}
-                      </td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perHalb) : row.perHalb, row.unit, true)} {formatPrintUnit(row.unit, true)}
-                      </td>
-                      <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
-                        {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perGanz) : row.perGanz, row.unit, true)} {formatPrintUnit(row.unit, true)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', marginBottom: '1.5rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Artikel</th>
+                        <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Gesamtmenge</th>
+                        <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen halben Anteil</th>
+                        <th style={{ borderBottom: '2px solid black', padding: '8px' }}>Einen ganzen Anteil</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(row => (
+                        <tr key={`${depot.kuerzel}-${row.id}`}>
+                          <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}><strong>{row.articleName}</strong></td>
+                          <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                            {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.totalAmount) : row.totalAmount, row.unit, true)} {formatPrintUnit(row.unit, true)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                            {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perHalb) : row.perHalb, row.unit, true)} {formatPrintUnit(row.unit, true)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid #ddd', padding: '8px' }}>
+                            {formatPrintAmount(row.unit === 'kg' ? toNetKg(row.perGanz) : row.perGanz, row.unit, true)} {formatPrintUnit(row.unit, true)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-                {rows.length === 0 && <p>Keine Ernte für dieses Depot erfasst.</p>}
-             </section>
-           );
-         })}
+                  {rows.length === 0 && <p>Keine Ernte für dieses Depot erfasst.</p>}
+                </section>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -512,36 +512,36 @@ function App() {
           />
           <div>
             <h1 style={{ color: 'var(--color-primary)' }}>AckerApp</h1>
-           <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
+            <p style={{ color: 'var(--color-text-light)' }}>Offline Depot-Verwaltung &amp; Ernteplanung</p>
           </div>
         </div>
-        
+
         <div className="header-controls" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <div className="tab-group" style={{ display: 'flex', gap: '1rem', background: 'var(--color-surface-solid)', padding: '0.4rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <button
-               className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
-               onClick={() => setActiveTab('calculator')}
-             >
-               🌾 Aktuelle Verteilung
-             </button>
-             <button 
-               className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
-               onClick={() => setActiveTab('history')}
-             >
-               📊 Historie &amp; Statistik
-             </button>
-             <button 
-               className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
-               onClick={() => setActiveTab('masterdata')}
-             >
-               ⚙️ Stammdaten
-             </button>
+              className={`tab-button ${activeTab === 'calculator' ? 'active' : ''}`}
+              onClick={() => setActiveTab('calculator')}
+            >
+              🌾 Aktuelle Verteilung
+            </button>
+            <button
+              className={`tab-button ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => setActiveTab('history')}
+            >
+              📊 Historie &amp; Statistik
+            </button>
+            <button
+              className={`tab-button ${activeTab === 'masterdata' ? 'active' : ''}`}
+              onClick={() => setActiveTab('masterdata')}
+            >
+              ⚙️ Stammdaten
+            </button>
           </div>
 
           <div className="year-select-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-surface-solid)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-light)' }}>Erntejahr:</span>
-            <select 
-              className="input" 
+            <select
+              className="input"
               style={{ width: 'auto', padding: '2px 8px', fontSize: '0.9rem', fontWeight: 600, border: 'none', background: 'transparent' }}
               value={selectedYear}
               onChange={e => setSelectedYear(e.target.value)}
@@ -550,20 +550,19 @@ function App() {
             </select>
           </div>
 
-        </div>
-
-        {activeTab === 'calculator' ? (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="button outline" style={{ backgroundColor: 'white' }} onClick={() => handlePrint('overview')} disabled={distributions.length === 0}>
-                🖨️ Gesamtverteilung
-             </button>
-            <button className="button" onClick={() => handlePrint('depots')} disabled={distributions.length === 0}>
+          {activeTab === 'calculator' ? (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="button outline" style={{ backgroundColor: 'white' }} onClick={() => handlePrint('overview')} disabled={distributions.length === 0}>
+                🖨️ Gesamt
+              </button>
+              <button className="button" onClick={() => handlePrint('depots')} disabled={distributions.length === 0}>
                 🖨️ Depots
-             </button>
-          </div>
-        ) : (
-          <div style={{ width: '200px' }}></div>
-        )}
+              </button>
+            </div>
+          ) : (
+            <div style={{ width: '200px' }}></div>
+          )}
+        </div>
       </header>
 
       {activeTab === 'calculator' && (
@@ -575,8 +574,8 @@ function App() {
               <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>🌱 Neue Ernte eintragen</h2>
               <div className="form-group">
                 <label>Artikel auswählen</label>
-                <select 
-                  className="input" 
+                <select
+                  className="input"
                   value={selectedArticle}
                   onChange={e => setSelectedArticle(e.target.value)}
                 >
@@ -587,8 +586,8 @@ function App() {
               </div>
               <div className="form-group">
                 <label>Gesamtmenge</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   className="input"
                   placeholder="z.B. 150"
                   value={amount}
@@ -598,13 +597,13 @@ function App() {
                   onKeyDown={e => e.key === 'Enter' && handleAddHarvest()}
                 />
               </div>
-              
+
               <button className="button" style={{ width: '100%', marginTop: '0.5rem' }} onClick={handleAddHarvest}>
-                 ＋ Zur Verteilung hinzufügen
-               </button>
+                ＋ Zur Verteilung hinzufügen
+              </button>
             </div>
-            </div>
-          
+          </div>
+
           {/* Main Area / Distributions */}
           <div>
             {distributions.length === 0 && (
@@ -613,204 +612,206 @@ function App() {
                 <p style={{ color: 'var(--color-text-light)' }}>Wähle links einen Artikel und eine Menge, um die Verteilung zu berechnen.</p>
               </div>
             )}
-            
+
             {distributions.map((dist, idx) => {
               const remainderAllocation = getRemainderAllocation(dist);
 
               return (
-              <div key={dist.id} className="glass-panel animate-in" style={{ padding: '1.5rem', marginBottom: '1.5rem', animationDelay: `${idx * 0.1}s` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ flex: '0 0 32%', maxWidth: '360px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{dist.articleName}</h3>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-surface-solid)', borderRadius: '6px', border: '1px solid var(--color-border)', padding: '2px' }}>
-                        <input 
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={dist.totalHarvested}
-                          onChange={(e) => handleUpdateAmount(dist.id, Number(e.target.value))}
-                          style={{ width: '80px', border: 'none', background: 'transparent', textAlign: 'right', outline: 'none', fontWeight: 600, color: 'var(--color-primary)', fontSize: '0.95rem' }}
-                        />
-                        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-light)', padding: '0 8px 0 4px', fontWeight: 500 }}>{dist.unit}</span>
-                      </div>
+                <div key={dist.id} className="glass-panel animate-in" style={{ padding: '1.5rem', marginBottom: '1.5rem', animationDelay: `${idx * 0.1}s` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1rem' }}>
+                    <div style={{ flex: '0 0 32%', maxWidth: '360px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <h3 style={{ fontSize: '1.2rem', margin: 0 }}>{dist.articleName}</h3>
 
-                      {dist.excludedDepots && dist.excludedDepots.length > 0 && (
-                        <span className="badge" style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)' }}>
-                          {dist.excludedDepots.length} ausgeschlossen
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--color-surface-solid)', borderRadius: '6px', border: '1px solid var(--color-border)', padding: '2px' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={dist.totalHarvested}
+                            onChange={(e) => handleUpdateAmount(dist.id, Number(e.target.value))}
+                            style={{ width: '80px', border: 'none', background: 'transparent', textAlign: 'right', outline: 'none', fontWeight: 600, color: 'var(--color-primary)', fontSize: '0.95rem' }}
+                          />
+                          <span style={{ fontSize: '0.85rem', color: 'var(--color-text-light)', padding: '0 8px 0 4px', fontWeight: 500 }}>{dist.unit}</span>
+                        </div>
+
+                        {dist.excludedDepots && dist.excludedDepots.length > 0 && (
+                          <span className="badge" style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)' }}>
+                            {dist.excludedDepots.length} ausgeschlossen
+                          </span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
+                        Rechnerisch entspricht ein <strong style={{ color: 'var(--color-primary)' }}>halber Anteil ca. {dist.unit === 'kg' ? `${Math.round(dist.sharePerHalb * 1000).toLocaleString('de-DE')} g` : `${dist.sharePerHalb} ${dist.unit}`}</strong>.
+                      </span>
+                      {dist.unit === 'Stück' && dist.sharePerHalb < 1 && (
+                        <div style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)', fontSize: '0.85rem', marginTop: '0.55rem' }}>
+                          ⚠️ <strong>Achtung:</strong> Die Menge reicht nicht für mindestens 1 Stück pro Person. Bitte Depots ausschließen!
+                        </div>
                       )}
                     </div>
-                    <span style={{ fontSize: '0.95rem', color: 'var(--color-text-light)' }}>
-                      Rechnerisch entspricht ein <strong style={{color: 'var(--color-primary)'}}>halber Anteil ca. {dist.unit === 'kg' ? `${Math.round(dist.sharePerHalb * 1000).toLocaleString('de-DE')} g` : `${dist.sharePerHalb} ${dist.unit}`}</strong>.
-                    </span>
-                    {dist.unit === 'Stück' && dist.sharePerHalb < 1 && (
-                      <div style={{ background: 'rgba(225, 29, 72, 0.1)', color: 'var(--color-danger)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--color-danger)', fontSize: '0.85rem', marginTop: '0.55rem' }}>
-                        ⚠️ <strong>Achtung:</strong> Die Menge reicht nicht für mindestens 1 Stück pro Person. Bitte Depots ausschließen!
-                      </div>
-                    )}
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: '1 1 68%', minWidth: 0 }}>
-                     {dist.remainder > 0 && (
-                       <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)', flex: '1 1 auto', minWidth: 0 }}>
-                         <div style={{ fontWeight: 500, color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-                           📦 Rest: {dist.remainder} {dist.unit} übrig
-                         </div>
-                         {dist.unit === 'Stück' ? (
-                           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-                             Wähle unten Depots aus, auf die der Rest gleichmäßig verteilt wird (in vollen halben-Anteil-Runden).
-                             <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                               <button
-                                 type="button"
-                                 className="button"
-                                 style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
-                                 onClick={() => handleSelectAllGeschenkDepots(dist.id)}
-                               >
-                                 ✓ Alle auswählen
-                               </button>
-                               <button
-                                 type="button"
-                                 className="button"
-                                 style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
-                                 onClick={() => handleClearGeschenkDepots(dist.id)}
-                               >
-                                 ✕ Auswahl aufheben
-                               </button>
-                             </div>
-                             <div style={{ marginTop: '0.35rem' }}>
-                               Verteilt: <strong>{remainderAllocation.distributedAmount} {dist.unit}</strong>
-                               {remainderAllocation.openRemainder > 0 && (
-                                 <span style={{ color: 'var(--color-danger)', marginLeft: '0.5rem' }}>
-                                   (nicht verteilbar: {remainderAllocation.openRemainder} {dist.unit})
-                                 </span>
-                               )}
-                             </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'end', gap: '0.75rem', flex: '1 1 68%', minWidth: 0 }}>
+                      {dist.remainder > 0 && (
+                        <div style={{ background: 'var(--color-surface-solid)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(225, 29, 72, 0.2)', flex: '1 1 auto', minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                            📦 Rest: {dist.remainder} {dist.unit} übrig
+                          </div>
+                          {dist.unit === 'Stück' ? (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                              Wähle unten Depots aus, auf die der Rest gleichmäßig verteilt wird (in vollen halben-Anteil-Runden).
+                              <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                  type="button"
+                                  className="button"
+                                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                                  onClick={() => handleSelectAllGeschenkDepots(dist.id)}
+                                >
+                                  ✓ Alle auswählen
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button"
+                                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                                  onClick={() => handleClearGeschenkDepots(dist.id)}
+                                >
+                                  ✕ Auswahl aufheben
+                                </button>
+                              </div>
+                              <div style={{ marginTop: '0.35rem' }}>
+                                Verteilt: <strong>{remainderAllocation.distributedAmount} {dist.unit}</strong>
+                                {remainderAllocation.openRemainder > 0 && (
+                                  <span style={{ color: 'var(--color-danger)', marginLeft: '0.5rem' }}>
+                                    (nicht verteilbar: {remainderAllocation.openRemainder} {dist.unit})
+                                  </span>
+                                )}
+                              </div>
                               <div style={{ marginTop: '0.25rem' }}>
                                 Zusatz pro halbem Anteil (aktuelle Auswahl): <strong>+{remainderAllocation.rounds} Stück</strong>
                               </div>
-                             {dist.geschenkeDepotKuerzel.length > 0 && remainderAllocation.rounds === 0 && (
-                               <div style={{ marginTop: '0.35rem', color: 'var(--color-danger)' }}>
-                                 ⚠️ Keine volle Runde möglich – wähle weniger oder andere Depots.
-                               </div>
-                             )}
-                           </div>
-                         ) : (
-                           <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
-                             kg-Produkte werden restlos verteilt – hier ist keine Resteverteilung nötig.
-                           </div>
-                         )}
-                       </div>
-                     )}
+                              {dist.geschenkeDepotKuerzel.length > 0 && remainderAllocation.rounds === 0 && (
+                                <div style={{ marginTop: '0.35rem', color: 'var(--color-danger)' }}>
+                                  ⚠️ Keine volle Runde möglich – wähle weniger oder andere Depots.
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--color-text-light)' }}>
+                              kg-Produkte werden restlos verteilt – hier ist keine Resteverteilung nötig.
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                     <button 
-                       onClick={() => handleDeleteDistribution(dist.id)}
-                       title="Artikel aus Verteilung entfernen"
-                       style={{ background: 'transparent', border: '1px solid transparent', cursor: 'pointer', fontSize: '0.85rem', padding: '0.35rem 0.5rem', borderRadius: '6px', opacity: 0.5, transition: 'var(--transition)', color: 'var(--color-danger)' }}
-                       onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'var(--color-danger)'; }}
-                       onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.borderColor = 'transparent'; }}
-                     >
-                       ✕ Entfernen
-                     </button>
+                      <button
+                        onClick={() => handleDeleteDistribution(dist.id)}
+                        title="Artikel aus Verteilung entfernen"
+                        style={{ width: '76px', background: 'transparent', border: '1px solid transparent', cursor: 'pointer', fontSize: '0.85rem', padding: '0.35rem 0.5rem', borderRadius: '6px', opacity: 0.5, transition: 'var(--transition)', color: 'var(--color-danger)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.borderColor = 'var(--color-danger)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.borderColor = 'transparent'; }}
+                      >
+                        ✕ Entfernen
+                      </button>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="table-container">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Aktiv</th>
-                        <th>Depot</th>
-                        {dist.unit === 'kg' ? (
-                          <>
-                            <th>Brutto (kg)</th>
-                            <th>Netto (kg)</th>
-                          </>
-                        ) : (
-                           <th>St. pro ½ Anteil</th>
-                        )}
-                        {dist.unit === 'Stück' && dist.remainder > 0 && <th>Rest zuteilen</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dist.results.map(res => {
-                        const matchedDepot = editableDepots.find(d => d.kuerzel === res.depotKuerzel);
-                        const ratioState = fairnessByArticle[dist.articleName]?.[res.depotKuerzel];
-                        let indicator = null;
-                        if (ratioState === 'wenig') indicator = <span title="Letzte 12 Monate: Deutlich weniger als Durchschnitt erhalten (Nachholbedarf)" style={{marginLeft: '0.5rem', cursor: 'help'}}>🔴🔻</span>;
-                        if (ratioState === 'viel')  indicator = <span title="Letzte 12 Monate: Deutlich mehr als Durchschnitt erhalten" style={{marginLeft: '0.5rem', cursor: 'help'}}>🟢🔺</span>;
 
-                        return (
-                        <tr key={res.depotKuerzel} style={{ opacity: res.isExcluded ? 0.5 : 1, background: res.isExcluded ? 'rgba(0,0,0,0.02)' : 'transparent', transition: 'var(--transition)' }}>
-                          <td style={{ width: '60px', textAlign: 'center' }}>
-                            <input 
-                              type="checkbox" 
-                              title="Wenn deaktiviert, erhält dieses Depot keinen Anteil von diesem Artikel."
-                              checked={!res.isExcluded}
-                              onChange={() => handleToggleExclusion(dist.id, res.depotKuerzel)}
-                              style={{ cursor: 'pointer', transform: 'scale(1.2)', accentColor: 'var(--color-primary)' }}
-                            />
-                          </td>
-                          <td>
-                            {res.depotKuerzel} {indicator}
-                            <span style={{ marginLeft: '0.5rem', color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
-                               ({matchedDepot?.gesamtHalbeAnteile} halbe Ant.)
-                             </span>
-                             {res.isExcluded && <i style={{marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-danger)'}}>(ausgeschl.)</i>}
-                          </td>
-                            {dist.unit === 'kg' ? (
-                              <>
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Aktiv</th>
+                          <th>Depot</th>
+                          {dist.unit === 'kg' ? (
+                            <>
+                              <th>Brutto (kg)</th>
+                              <th>Netto (kg)</th>
+                            </>
+                          ) : (
+                            <th>St. pro ½ Anteil</th>
+                          )}
+                          {dist.unit === 'Stück' && dist.remainder > 0 && <th>Rest zuteilen</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dist.results.map(res => {
+                          const matchedDepot = editableDepots.find(d => d.kuerzel === res.depotKuerzel);
+                          const ratioState = fairnessByArticle[dist.articleName]?.[res.depotKuerzel];
+                          let indicator = null;
+                          if (ratioState === 'wenig') indicator = <span title="Letzte 12 Monate: Deutlich weniger als Durchschnitt erhalten (Nachholbedarf)" style={{ marginLeft: '0.5rem', cursor: 'help' }}>🔴🔻</span>;
+                          if (ratioState === 'viel') indicator = <span title="Letzte 12 Monate: Deutlich mehr als Durchschnitt erhalten" style={{ marginLeft: '0.5rem', cursor: 'help' }}>🟢🔺</span>;
+
+                          return (
+                            <tr key={res.depotKuerzel} style={{ opacity: res.isExcluded ? 0.5 : 1, background: res.isExcluded ? 'rgba(0,0,0,0.02)' : 'transparent', transition: 'var(--transition)' }}>
+                              <td style={{ width: '60px', textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  title="Wenn deaktiviert, erhält dieses Depot keinen Anteil von diesem Artikel."
+                                  checked={!res.isExcluded}
+                                  onChange={() => handleToggleExclusion(dist.id, res.depotKuerzel)}
+                                  style={{ cursor: 'pointer', transform: 'scale(1.2)', accentColor: 'var(--color-primary)' }}
+                                />
+                              </td>
+                              <td>
+                                {res.depotKuerzel} {indicator}
+                                <span style={{ marginLeft: '0.5rem', color: 'var(--color-text-light)', fontSize: '0.85rem' }}>
+                                  ({matchedDepot?.gesamtHalbeAnteile} halbe Ant.)
+                                </span>
+                                {res.isExcluded && <i style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>(ausgeschl.)</i>}
+                              </td>
+                              {dist.unit === 'kg' ? (
+                                <>
+                                  <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
+                                    {res.isExcluded
+                                      ? '-'
+                                      : round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0)).toFixed(2)}
+                                  </td>
+                                  <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
+                                    {res.isExcluded
+                                      ? '-'
+                                      : toNetKg(round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0))).toFixed(2)}
+                                  </td>
+                                </>
+                              ) : (
                                 <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
                                   {res.isExcluded
                                     ? '-'
-                                    : round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0)).toFixed(2)}
-                                </td>
-                                <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
-                                  {res.isExcluded
-                                    ? '-'
-                                    : toNetKg(round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0))).toFixed(2)}
-                                </td>
-                              </>
-                            ) : (
-                              <td style={{ fontWeight: res.isExcluded ? 400 : 600 }}>
-                                {res.isExcluded
-                                  ? '-'
-                                  : (() => {
+                                    : (() => {
                                       const totalForDepot = round2(res.calculatedAmount + (remainderAllocation.allocationsByDepot[res.depotKuerzel] || 0));
                                       const halbeAnteile = matchedDepot?.gesamtHalbeAnteile ?? 1;
                                       const perHalb = halbeAnteile > 0 ? Math.round(totalForDepot / halbeAnteile) : 0;
                                       return perHalb.toString();
                                     })()}
-                              </td>
-                            )}
-                          {dist.unit === 'Stück' && dist.remainder > 0 && (
-                            <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
-                              {!res.isExcluded && (
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={dist.geschenkeDepotKuerzel.includes(res.depotKuerzel)}
-                                    onChange={e => handleSelectGeschenk(dist.id, res.depotKuerzel, e.target.checked)}
-                                    style={{ cursor: 'pointer', accentColor: 'var(--color-danger)' }}
-                                  />
-                                  <span>
-                                    {remainderAllocation.allocationsByDepot[res.depotKuerzel]
-                                      ? `+ ${remainderAllocation.allocationsByDepot[res.depotKuerzel]}`
-                                      : ''}
-                                  </span>
-                                </label>
+                                </td>
                               )}
-                              {res.isExcluded && '-'}
-                            </td>
-                          )}
-                        </tr>
-                      )})}
-                    </tbody>
-                  </table>
+                              {dist.unit === 'Stück' && dist.remainder > 0 && (
+                                <td style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+                                  {!res.isExcluded && (
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={dist.geschenkeDepotKuerzel.includes(res.depotKuerzel)}
+                                        onChange={e => handleSelectGeschenk(dist.id, res.depotKuerzel, e.target.checked)}
+                                        style={{ cursor: 'pointer', accentColor: 'var(--color-danger)' }}
+                                      />
+                                      <span>
+                                        {remainderAllocation.allocationsByDepot[res.depotKuerzel]
+                                          ? `+ ${remainderAllocation.allocationsByDepot[res.depotKuerzel]}`
+                                          : ''}
+                                      </span>
+                                    </label>
+                                  )}
+                                  {res.isExcluded && '-'}
+                                </td>
+                              )}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )})}
+              )
+            })}
           </div>
         </div>
       )}
