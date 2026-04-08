@@ -410,6 +410,16 @@ function App() {
           maxWidth: '1200px',
           padding: '2rem'
         }}>
+          <style>
+            {`
+              @media print {
+                @page {
+                  size: ${printMode === 'overview' ? 'A4 landscape' : 'A4 portrait'};
+                  margin: 1cm;
+                }
+              }
+            `}
+          </style>
           <div className="print-layout">
             {printMode === 'overview' && (
               <section className="print-summary-block">

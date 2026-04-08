@@ -280,6 +280,18 @@ export default function HistoryView({ data, selectedYear, allDepots, onHistoryCh
 
   return (
     <div className={`glass-panel animate-in ${printingSpecific ? 'no-panel-style' : ''}`} style={{ padding: printingSpecific ? '0' : '2rem', width: '100%', maxWidth: '1000px', margin: '0 auto', background: printingSpecific ? 'white' : '' }}>
+      {printingSpecific && (
+        <style>
+          {`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 1cm;
+              }
+            }
+          `}
+        </style>
+      )}
       
       <div className={printingSpecific ? 'no-print' : ''} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

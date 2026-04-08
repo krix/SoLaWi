@@ -404,13 +404,7 @@ tr:hover td {
     break-inside: avoid;
   }
 
-  @page landscape-page {
-    size: A4 landscape;
-    margin: 1cm;
-  }
-
   .print-summary-block {
-    page: landscape-page;
     margin-bottom: 0.8cm;
     break-inside: avoid;
     page-break-inside: avoid;
@@ -430,10 +424,7 @@ tr:hover td {
     min-height: 7.5cm;
   }
 
-  @page {
-    size: A4 portrait;
-    margin: 1cm;
-  }
+  /* Portrait default via JS when needed */
 
   table,
   th,
